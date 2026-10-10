@@ -30,8 +30,9 @@ also in the menu-bar icon's menu.
 Repeated presses cycle sizes:
 
 - **Halves:** ½ → ⅔ → ⅓ → ½ of the screen (width for left/right, height for top/bottom).
-- **Center:** the window's own size → ⅔ of the screen's width and height → back to its own
-  size. The third press works as an undo for the resize.
+- **Quarters:** the width cycles ½ → ⅔ → ⅓ the same way; the height stays half the screen.
+- **Center:** the first press centers the window at its own size. The second resizes it to ⅔
+  of the screen's width and height. Further presses keep it at ⅔.
 
 A repeated press advances when the window is still where the last press put it, or already
 sits at one of those sizes. Otherwise it starts again at the first step. Turn this off with
@@ -40,7 +41,7 @@ sits at one of those sizes. Otherwise it starts again at the first step. Turn th
 ### About the hyper key
 
 While TinyTiler runs with **Caps Lock as Hyper Key** on (the default), Caps Lock no longer
-toggles capitals. Other keys pressed while holding Caps Lock type normally. W A S D F C E
+toggles capitals. Other keys pressed while holding Caps Lock type normally. The bound keys
 are matched by physical position, so they stay under your left hand on any keyboard layout.
 
 Turning the option off in the menu, or quitting TinyTiler, gives Caps Lock back and restores

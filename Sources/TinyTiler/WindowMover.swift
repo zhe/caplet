@@ -61,7 +61,6 @@ enum WindowMover {
         let step = cycling ? Cycle.nextStep(for: action, window: current, screen: screen, last: last) : 0
 
         let target: CGRect
-        var restoreSize: CGSize?
         switch action {
         case .maximize:
             target = screen
@@ -70,10 +69,8 @@ enum WindowMover {
             target = Layout.move(current, from: screen, to: screens[(index + 1) % screens.count])
         case .leftHalf, .rightHalf, .topHalf, .bottomHalf,
              .topLeft, .topRight, .bottomLeft, .bottomRight, .center:
-            guard let cycled = Cycle.target(for: action, step: step, window: current, screen: screen, last: last)
-            else { return }
-            target = cycled.frame
-            restoreSize = cycled.restoreSize
+            guard let tiled = Cycle.target(for: action, step: step, window: current, screen: screen) else { return }
+            target = tiled
         }
 
         try withEnhancedUIDisabled(appElement) {
@@ -81,8 +78,7 @@ enum WindowMover {
         }
 
         if Cycle.supports(action), let achieved = try? frame(of: window) {
-            lastCycle = (window, CycleRecord(action: action, step: step, screen: screen,
-                                             achieved: achieved, restoreSize: restoreSize))
+            lastCycle = (window, CycleRecord(action: action, step: step, screen: screen, achieved: achieved))
         } else {
             lastCycle = nil
         }
