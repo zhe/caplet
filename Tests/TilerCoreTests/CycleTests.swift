@@ -87,8 +87,51 @@ final class CycleTests: XCTestCase {
         XCTAssertEqual(Cycle.nextStep(for: .leftHalf, window: window, screen: other, last: last), 0)
     }
 
-    func testOnlySidesCycle() {
+    func testMaximizeAndNextDisplayDontCycle() {
         XCTAssertEqual(Cycle.nextStep(for: .maximize, window: screen, screen: screen, last: nil), 0)
+        XCTAssertFalse(Cycle.supports(.maximize))
         XCTAssertFalse(Cycle.supports(.nextDisplay))
+    }
+
+    /// Simulates presses, with the app accepting every requested frame.
+    private func pressCenter(_ times: Int, from start: CGRect) -> [CGRect] {
+        var window = start
+        var last: CycleRecord?
+        var frames: [CGRect] = []
+        for _ in 0..<times {
+            let step = Cycle.nextStep(for: .center, window: window, screen: screen, last: last)
+            let target = Cycle.target(for: .center, step: step, window: window, screen: screen, last: last)!
+            window = target.frame
+            last = CycleRecord(action: .center, step: step, screen: screen, achieved: window,
+                               restoreSize: target.restoreSize)
+            frames.append(window)
+        }
+        return frames
+    }
+
+    func testCenterThenTwoThirdsThenBackToOwnSize() {
+        let frames = pressCenter(4, from: CGRect(x: 10, y: 600, width: 801, height: 500))
+        let centered = CGRect(x: 320, y: 212, width: 801, height: 500)
+        XCTAssertEqual(frames, [
+            centered,
+            CGRect(x: 240, y: 171, width: 960, height: 583),
+            centered,
+            CGRect(x: 240, y: 171, width: 960, height: 583),
+        ])
+    }
+
+    func testCenterOnAlreadyCenteredWindowGrows() {
+        let centered = Layout.centered(CGRect(x: 0, y: 0, width: 700, height: 400), in: screen)
+        XCTAssertEqual(Cycle.nextStep(for: .center, window: centered, screen: screen, last: nil), 1)
+    }
+
+    func testCenterAfterManualResizeStartsOver() {
+        let twoThirds = Cycle.target(for: .center, step: 1, window: .zero, screen: screen, last: nil)!.frame
+        let last = CycleRecord(action: .center, step: 1, screen: screen, achieved: twoThirds,
+                               restoreSize: CGSize(width: 801, height: 500))
+        let resized = CGRect(x: 100, y: 100, width: 600, height: 300)
+        XCTAssertEqual(Cycle.nextStep(for: .center, window: resized, screen: screen, last: last), 0)
+        let target = Cycle.target(for: .center, step: 0, window: resized, screen: screen, last: last)!
+        XCTAssertEqual(target.frame.size, resized.size)
     }
 }

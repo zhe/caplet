@@ -17,15 +17,20 @@ Hold **Caps Lock** and press a key with the same hand:
 The fallback shortcuts always work, even with the hyper key turned off. The same actions are
 also in the menu-bar icon's menu.
 
-Pressing a half again cycles its size through ½ → ⅔ → ⅓ → ½ (width for left/right, height
-for top/bottom). A repeated press advances when the window is still where the last press put
-it, or already sits at one of those sizes. Otherwise it starts again at ½. Turn this off with
-**Cycle ½ → ⅔ → ⅓ on Repeat** in the menu.
+Repeated presses cycle sizes:
+
+- **Halves:** ½ → ⅔ → ⅓ → ½ of the screen (width for left/right, height for top/bottom).
+- **Center:** the window's own size → ⅔ of the screen's width and height → back to its own
+  size. The third press works as an undo for the resize.
+
+A repeated press advances when the window is still where the last press put it, or already
+sits at one of those sizes. Otherwise it starts again at the first step. Turn this off with
+**Cycle Sizes on Repeated Presses** in the menu.
 
 ### About the hyper key
 
 While TinyTiler runs with **Caps Lock as Hyper Key** on (the default), Caps Lock no longer
-toggles capitals. Other keys pressed while holding Caps Lock type normally. W A S D F E
+toggles capitals. Other keys pressed while holding Caps Lock type normally. W A S D F C E
 are matched by physical position, so they stay under your left hand on any keyboard layout.
 
 Turning the option off in the menu, or quitting TinyTiler, gives Caps Lock back and restores

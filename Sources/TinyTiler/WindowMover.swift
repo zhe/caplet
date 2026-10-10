@@ -57,22 +57,22 @@ enum WindowMover {
         guard let index = Layout.screenIndex(for: current, in: screens) else { throw TileError.noScreens }
 
         let screen = screens[index]
-        var step = 0
-        if cycling, Cycle.supports(action) {
-            let last = lastCycle.flatMap { CFEqual($0.window, window) ? $0.record : nil }
-            step = Cycle.nextStep(for: action, window: current, screen: screen, last: last)
-        }
+        let last = cycling ? lastCycle.flatMap { CFEqual($0.window, window) ? $0.record : nil } : nil
+        let step = cycling ? Cycle.nextStep(for: action, window: current, screen: screen, last: last) : 0
 
         let target: CGRect
+        var restoreSize: CGSize?
         switch action {
-        case .center:
-            target = Layout.centered(current, in: screen)
+        case .maximize:
+            target = screen
         case .nextDisplay:
             guard screens.count > 1 else { throw TileError.singleDisplay }
             target = Layout.move(current, from: screen, to: screens[(index + 1) % screens.count])
-        case .leftHalf, .rightHalf, .topHalf, .bottomHalf, .maximize:
-            guard let frame = Layout.frame(for: action, in: screen, fraction: Cycle.fractions[step]) else { return }
-            target = frame
+        case .leftHalf, .rightHalf, .topHalf, .bottomHalf, .center:
+            guard let cycled = Cycle.target(for: action, step: step, window: current, screen: screen, last: last)
+            else { return }
+            target = cycled.frame
+            restoreSize = cycled.restoreSize
         }
 
         try withEnhancedUIDisabled(appElement) {
@@ -80,7 +80,8 @@ enum WindowMover {
         }
 
         if Cycle.supports(action), let achieved = try? frame(of: window) {
-            lastCycle = (window, CycleRecord(action: action, step: step, screen: screen, achieved: achieved))
+            lastCycle = (window, CycleRecord(action: action, step: step, screen: screen,
+                                             achieved: achieved, restoreSize: restoreSize))
         } else {
             lastCycle = nil
         }

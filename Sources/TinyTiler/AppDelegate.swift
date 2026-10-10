@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let permissionItem = NSMenuItem(title: "Grant Accessibility Access…",
                                             action: #selector(openAccessibilitySettings), keyEquivalent: "")
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-    private let cycleItem = NSMenuItem(title: "Cycle ½ → ⅔ → ⅓ on Repeat",
+    private let cycleItem = NSMenuItem(title: "Cycle Sizes on Repeated Presses",
                                        action: #selector(toggleCycling), keyEquivalent: "")
     private let hyperItem = NSMenuItem(title: "Caps Lock as Hyper Key",
                                        action: #selector(toggleHyperKey), keyEquivalent: "")
