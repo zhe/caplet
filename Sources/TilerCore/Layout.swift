@@ -9,6 +9,7 @@ public enum TileAction: String, CaseIterable, Sendable {
     case topHalf
     case bottomHalf
     case maximize
+    case center
     case nextDisplay
 
     public var title: String {
@@ -18,6 +19,7 @@ public enum TileAction: String, CaseIterable, Sendable {
         case .topHalf: return "Top Half"
         case .bottomHalf: return "Bottom Half"
         case .maximize: return "Maximize"
+        case .center: return "Center"
         case .nextDisplay: return "Next Display"
         }
     }
@@ -34,7 +36,8 @@ public enum Layout {
 
     /// Target frame for a single-screen action inside `visible` (the screen's visible frame).
     /// `fraction` is the share of the screen width (left/right) or height (top/bottom) to use.
-    /// Returns nil for `.nextDisplay`, which needs a destination screen; use `move(_:from:to:)`.
+    /// Returns nil for actions that depend on the window's current frame:
+    /// `.center` (use `centered(_:in:)`) and `.nextDisplay` (use `move(_:from:to:)`).
     public static func frame(for action: TileAction, in visible: CGRect, fraction: CGFloat = 1.0 / 2) -> CGRect? {
         switch action {
         case .leftHalf:
@@ -52,9 +55,18 @@ public enum Layout {
             return CGRect(x: visible.minX, y: visible.maxY - height, width: visible.width, height: height)
         case .maximize:
             return visible
-        case .nextDisplay:
+        case .center, .nextDisplay:
             return nil
         }
+    }
+
+    /// Keeps the window's size (shrunk to fit if needed) and puts it in the middle of `visible`.
+    public static func centered(_ window: CGRect, in visible: CGRect) -> CGRect {
+        let width = min(window.width, visible.width)
+        let height = min(window.height, visible.height)
+        return CGRect(x: (visible.midX - width / 2).rounded(.down),
+                      y: (visible.midY - height / 2).rounded(.down),
+                      width: width, height: height)
     }
 
     /// Index of the screen that overlaps `window` the most, falling back to the nearest screen

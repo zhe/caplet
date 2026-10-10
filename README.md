@@ -11,6 +11,7 @@ Hold **Caps Lock** and press a key with the same hand:
 | Bottom half | Caps Lock + S | ⌃⌥↓ |
 | Right half | Caps Lock + D | ⌃⌥→ |
 | Maximize (fill the visible screen) | Caps Lock + F | ⌃⌥↩ |
+| Center, keeping the window's size (shrunk only if it doesn't fit) | Caps Lock + C | ⌃⌥C |
 | Move to next display, keeping its relative size and position | Caps Lock + E | ⌃⌥⌘→ |
 
 The fallback shortcuts always work, even with the hyper key turned off. The same actions are

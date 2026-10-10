@@ -27,7 +27,7 @@ public enum Cycle {
     public static func supports(_ action: TileAction) -> Bool {
         switch action {
         case .leftHalf, .rightHalf, .topHalf, .bottomHalf: return true
-        case .maximize, .nextDisplay: return false
+        case .maximize, .center, .nextDisplay: return false
         }
     }
 

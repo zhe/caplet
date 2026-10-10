@@ -37,6 +37,19 @@ final class LayoutTests: XCTestCase {
         XCTAssertNil(Layout.frame(for: .nextDisplay, in: visible))
     }
 
+    func testCenterKeepsSize() {
+        let visible = CGRect(x: 0, y: 25, width: 1440, height: 875)
+        XCTAssertEqual(Layout.centered(CGRect(x: 10, y: 600, width: 801, height: 500), in: visible),
+                       CGRect(x: 319, y: 212, width: 801, height: 500))
+        XCTAssertNil(Layout.frame(for: .center, in: visible))
+    }
+
+    func testCenterShrinksOversizedWindow() {
+        let visible = CGRect(x: 1440, y: -200, width: 1920, height: 1055)
+        XCTAssertEqual(Layout.centered(CGRect(x: 0, y: 0, width: 2500, height: 600), in: visible),
+                       CGRect(x: 1440, y: 27, width: 1920, height: 600))
+    }
+
     func testScreenIndexPicksLargestOverlap() {
         let screens = [CGRect(x: 0, y: 0, width: 1000, height: 800),
                        CGRect(x: 1000, y: 0, width: 1000, height: 800)]

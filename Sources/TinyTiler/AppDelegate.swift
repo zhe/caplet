@@ -28,6 +28,9 @@ struct Shortcut {
         case .maximize:
             return Shortcut(keyCode: kVK_Return, carbonModifiers: ctrlOpt,
                             keyEquivalent: "\r", modifierFlags: flags)
+        case .center:
+            return Shortcut(keyCode: kVK_ANSI_C, carbonModifiers: ctrlOpt,
+                            keyEquivalent: "c", modifierFlags: flags)
         case .nextDisplay:
             return Shortcut(keyCode: kVK_RightArrow, carbonModifiers: ctrlOpt | cmdKey,
                             keyEquivalent: arrow(NSRightArrowFunctionKey),
@@ -76,7 +79,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private static var hyperHintText: String {
         let keys = HyperBindings.keyLabels
         let wasd = [TileAction.topHalf, .leftHalf, .bottomHalf, .rightHalf].compactMap { keys[$0] }.joined(separator: " ")
-        return "Hold Caps Lock + \(wasd) halves · \(keys[.maximize] ?? "") maximize · \(keys[.nextDisplay] ?? "") next display"
+        let others: [(TileAction, String)] = [(.maximize, "maximize"), (.center, "center"), (.nextDisplay, "next display")]
+        let rest = others.map { "\(keys[$0.0] ?? "") \($0.1)" }.joined(separator: " · ")
+        return "Hold Caps Lock + \(wasd) halves · \(rest)"
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

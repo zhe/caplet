@@ -64,11 +64,15 @@ enum WindowMover {
         }
 
         let target: CGRect
-        if let single = Layout.frame(for: action, in: screen, fraction: Cycle.fractions[step]) {
-            target = single
-        } else {
+        switch action {
+        case .center:
+            target = Layout.centered(current, in: screen)
+        case .nextDisplay:
             guard screens.count > 1 else { throw TileError.singleDisplay }
             target = Layout.move(current, from: screen, to: screens[(index + 1) % screens.count])
+        case .leftHalf, .rightHalf, .topHalf, .bottomHalf, .maximize:
+            guard let frame = Layout.frame(for: action, in: screen, fraction: Cycle.fractions[step]) else { return }
+            target = frame
         }
 
         try withEnhancedUIDisabled(appElement) {
