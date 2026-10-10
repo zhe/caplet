@@ -25,7 +25,8 @@ Q  W  E        ↖  ↑  ↗
 ```
 
 The fallback shortcuts always work, even with the hyper key turned off. The same actions are
-also in the menu-bar icon's menu.
+also in the menu-bar icon's menu. Next to each item, the menu shows the shortcut that's in
+use: "Hyper A" style labels while the hyper key is active, and the ⌃⌥ shortcuts otherwise.
 
 Repeated presses cycle sizes:
 

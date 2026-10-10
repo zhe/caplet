@@ -66,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                        action: #selector(toggleCycling), keyEquivalent: "")
     private let hyperItem = NSMenuItem(title: "Caps Lock as Hyper Key",
                                        action: #selector(toggleHyperKey), keyEquivalent: "")
-    private let hyperHint = NSMenuItem(title: AppDelegate.hyperHintText, action: nil, keyEquivalent: "")
+    private var actionItems: [TileAction: NSMenuItem] = [:]
     private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin),
                                        keyEquivalent: "")
     private var loginItemError: String?
@@ -85,19 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         set { UserDefaults.standard.set(newValue, forKey: Self.hyperKeyDefaultsKey) }
     }
 
-    private static var hyperHintText: String {
-        let keys = HyperBindings.keyLabels
-        func labels(_ actions: [TileAction]) -> String {
-            actions.compactMap { keys[$0] }.joined(separator: " ")
-        }
-        let groups = [
-            "\(labels([.topHalf, .leftHalf, .bottomHalf, .rightHalf])) halves",
-            "\(labels([.topLeft, .topRight, .bottomLeft, .bottomRight])) corners",
-            "\(labels([.maximize])) maximize",
-            "\(labels([.center])) center",
-            "\(labels([.nextDisplay])) next display",
-        ]
-        return "Hold Caps Lock + " + groups.joined(separator: " · ")
+    private static func hyperLabel(for action: TileAction) -> String? {
+        HyperBindings.keyLabels[action].map { "Hyper \($0)" }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -142,21 +131,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         for action in TileAction.allCases {
             if action == .topLeft || action == .maximize { menu.addItem(.separator()) }
-            let shortcut = Shortcut.shortcut(for: action)
-            // Key equivalents here are display-only; the global hotkeys do the real work.
-            let item = NSMenuItem(title: action.title, action: #selector(menuAction(_:)),
-                                  keyEquivalent: shortcut.keyEquivalent)
-            item.keyEquivalentModifierMask = shortcut.modifierFlags
+            let item = NSMenuItem(title: action.title, action: #selector(menuAction(_:)), keyEquivalent: "")
             item.representedObject = action.rawValue
             item.target = self
             menu.addItem(item)
+            actionItems[action] = item
         }
+        showShortcuts(hyper: false)
 
         menu.addItem(.separator())
         hyperItem.target = self
         menu.addItem(hyperItem)
-        hyperHint.isEnabled = false
-        menu.addItem(hyperHint)
         cycleItem.target = self
         menu.addItem(cycleItem)
         loginItem.target = self
@@ -179,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         permissionItem.isHidden = trusted
         cycleItem.state = cyclingEnabled ? .on : .off
         hyperItem.state = hyperKeyEnabled ? .on : .off
-        hyperHint.isHidden = hyperKey.state != .active
+        showShortcuts(hyper: hyperKey.state == .active)
 
         var notes: [String] = []
         if !trusted { notes.append("Accessibility access is off") }
@@ -211,6 +196,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         for item in menu.items {
             if item.representedObject is String { item.isEnabled = trusted }
+        }
+    }
+
+    /// Shows whichever shortcuts currently work. Key equivalents are display-only (the global
+    /// hotkeys and the hyper key do the real work), and they only accept real modifiers, so
+    /// "Hyper X" is drawn into the title after a right-aligned tab stop instead.
+    private func showShortcuts(hyper: Bool) {
+        guard hyper else {
+            for (action, item) in actionItems {
+                let shortcut = Shortcut.shortcut(for: action)
+                item.attributedTitle = nil
+                item.keyEquivalent = shortcut.keyEquivalent
+                item.keyEquivalentModifierMask = shortcut.modifierFlags
+            }
+            return
+        }
+
+        let font = NSFont.menuFont(ofSize: 0)
+        func width(_ text: String) -> CGFloat {
+            (text as NSString).size(withAttributes: [.font: font]).width
+        }
+        let titleWidth = actionItems.keys.map { width($0.title) }.max() ?? 0
+        let labelWidth = actionItems.keys.compactMap { Self.hyperLabel(for: $0) }.map(width).max() ?? 0
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.tabStops = [NSTextTab(textAlignment: .right, location: ceil(titleWidth + 48 + labelWidth))]
+
+        for (action, item) in actionItems {
+            item.keyEquivalent = ""
+            item.keyEquivalentModifierMask = []
+            guard let label = Self.hyperLabel(for: action) else {
+                item.attributedTitle = nil
+                continue
+            }
+            let title = NSMutableAttributedString(string: action.title + "\t",
+                                                  attributes: [.font: font, .paragraphStyle: paragraph])
+            title.append(NSAttributedString(string: label, attributes: [
+                .font: font, .paragraphStyle: paragraph, .foregroundColor: NSColor.secondaryLabelColor,
+            ]))
+            item.attributedTitle = title
         }
     }
 
