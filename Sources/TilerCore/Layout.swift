@@ -8,6 +8,10 @@ public enum TileAction: String, CaseIterable, Sendable {
     case rightHalf
     case topHalf
     case bottomHalf
+    case topLeft
+    case topRight
+    case bottomLeft
+    case bottomRight
     case maximize
     case center
     case nextDisplay
@@ -18,6 +22,10 @@ public enum TileAction: String, CaseIterable, Sendable {
         case .rightHalf: return "Right Half"
         case .topHalf: return "Top Half"
         case .bottomHalf: return "Bottom Half"
+        case .topLeft: return "Top Left"
+        case .topRight: return "Top Right"
+        case .bottomLeft: return "Bottom Left"
+        case .bottomRight: return "Bottom Right"
         case .maximize: return "Maximize"
         case .center: return "Center"
         case .nextDisplay: return "Next Display"
@@ -35,7 +43,8 @@ public enum Layout {
     }
 
     /// Target frame for a single-screen action inside `visible` (the screen's visible frame).
-    /// `fraction` is the share of the screen width (left/right) or height (top/bottom) to use.
+    /// `fraction` is the share of the screen width (left/right and corners) or height
+    /// (top/bottom) to use. Corners are always half the screen height.
     /// Returns nil for actions that depend on the window's current frame:
     /// `.center` (use `centered(_:in:)`) and `.nextDisplay` (use `move(_:from:to:)`).
     public static func frame(for action: TileAction, in visible: CGRect, fraction: CGFloat = 1.0 / 2) -> CGRect? {
@@ -53,6 +62,12 @@ public enum Layout {
         case .bottomHalf:
             let height = visible.height - (visible.height * (1 - fraction)).rounded(.down)
             return CGRect(x: visible.minX, y: visible.maxY - height, width: visible.width, height: height)
+        case .topLeft, .topRight, .bottomLeft, .bottomRight:
+            let side: TileAction = action == .topLeft || action == .bottomLeft ? .leftHalf : .rightHalf
+            let edge: TileAction = action == .topLeft || action == .topRight ? .topHalf : .bottomHalf
+            guard let column = frame(for: side, in: visible, fraction: fraction),
+                  let row = frame(for: edge, in: visible) else { return nil }
+            return column.intersection(row)
         case .maximize:
             return visible
         case .center, .nextDisplay:

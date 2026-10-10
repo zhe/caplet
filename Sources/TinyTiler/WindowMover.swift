@@ -68,7 +68,8 @@ enum WindowMover {
         case .nextDisplay:
             guard screens.count > 1 else { throw TileError.singleDisplay }
             target = Layout.move(current, from: screen, to: screens[(index + 1) % screens.count])
-        case .leftHalf, .rightHalf, .topHalf, .bottomHalf, .center:
+        case .leftHalf, .rightHalf, .topHalf, .bottomHalf,
+             .topLeft, .topRight, .bottomLeft, .bottomRight, .center:
             guard let cycled = Cycle.target(for: action, step: step, window: current, screen: screen, last: last)
             else { return }
             target = cycled.frame

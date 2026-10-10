@@ -10,9 +10,19 @@ Hold **Caps Lock** and press a key with the same hand:
 | Left half | Caps Lock + A | ⌃⌥← |
 | Bottom half | Caps Lock + S | ⌃⌥↓ |
 | Right half | Caps Lock + D | ⌃⌥→ |
+| Top-left quarter | Caps Lock + Q | ⌃⌥U |
+| Top-right quarter | Caps Lock + E | ⌃⌥I |
+| Bottom-left quarter | Caps Lock + Z | ⌃⌥J |
+| Bottom-right quarter | Caps Lock + X | ⌃⌥K |
 | Maximize (fill the visible screen) | Caps Lock + F | ⌃⌥↩ |
 | Center, keeping the window's size (shrunk only if it doesn't fit) | Caps Lock + C | ⌃⌥C |
-| Move to next display, keeping its relative size and position | Caps Lock + E | ⌃⌥⌘→ |
+| Move to next display, keeping its relative size and position | Caps Lock + Space | ⌃⌥⌘→ |
+
+```
+Q  W  E        ↖  ↑  ↗
+ A  S  D        ←  ↓  →
+  Z  X  C       ↙  ↘  center
+```
 
 The fallback shortcuts always work, even with the hyper key turned off. The same actions are
 also in the menu-bar icon's menu.
@@ -93,7 +103,7 @@ plain Foundation, so the tests also run on Linux.
 | File | Role |
 |---|---|
 | `Sources/TilerCore/Layout.swift` | Pure geometry, all in Accessibility coordinates (top-left origin of the primary display, y down). |
-| `Sources/TilerCore/Cycle.swift` | Picks the next width in the ½ → ⅔ → ⅓ cycle. It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
+| `Sources/TilerCore/Cycle.swift` | Picks the next size for repeated presses (halves and center). It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
 | `Sources/TinyTiler/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
 | `Sources/TilerCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
 | `Sources/TinyTiler/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |

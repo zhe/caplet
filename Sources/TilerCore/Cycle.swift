@@ -24,7 +24,7 @@ public struct CycleRecord: Equatable, Sendable {
 }
 
 public enum Cycle {
-    /// Widths (left/right) or heights (top/bottom) visited by repeated presses, in order.
+    /// Widths (left/right, corners) or heights (top/bottom) visited by repeated presses, in order.
     public static let fractions: [CGFloat] = [1.0 / 2, 2.0 / 3, 1.0 / 3]
 
     /// Share of the screen's width and height used by the second press of `.center`.
@@ -32,7 +32,8 @@ public enum Cycle {
 
     public static func stepCount(for action: TileAction) -> Int {
         switch action {
-        case .leftHalf, .rightHalf, .topHalf, .bottomHalf: return fractions.count
+        case .leftHalf, .rightHalf, .topHalf, .bottomHalf,
+             .topLeft, .topRight, .bottomLeft, .bottomRight: return fractions.count
         case .center: return 2 // own size, then ⅔ of the screen
         case .maximize, .nextDisplay: return 1
         }
@@ -69,7 +70,8 @@ public enum Cycle {
     public static func target(for action: TileAction, step: Int, window: CGRect, screen: CGRect,
                               last: CycleRecord?) -> (frame: CGRect, restoreSize: CGSize?)? {
         switch action {
-        case .leftHalf, .rightHalf, .topHalf, .bottomHalf:
+        case .leftHalf, .rightHalf, .topHalf, .bottomHalf,
+             .topLeft, .topRight, .bottomLeft, .bottomRight:
             return Layout.frame(for: action, in: screen, fraction: fractions[step % fractions.count])
                 .map { ($0, nil) }
         case .center:

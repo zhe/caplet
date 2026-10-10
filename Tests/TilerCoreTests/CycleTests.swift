@@ -33,6 +33,32 @@ final class CycleTests: XCTestCase {
         XCTAssertEqual(bottomTwoThirds.maxY, screen.maxY)
     }
 
+    func testCornersTileTheScreen() {
+        let tl = Layout.frame(for: .topLeft, in: screen)!
+        let tr = Layout.frame(for: .topRight, in: screen)!
+        let bl = Layout.frame(for: .bottomLeft, in: screen)!
+        let br = Layout.frame(for: .bottomRight, in: screen)!
+        XCTAssertEqual(tl, CGRect(x: 0, y: 25, width: 720, height: 437))
+        XCTAssertEqual(tr, CGRect(x: 720, y: 25, width: 721, height: 437))
+        XCTAssertEqual(bl, CGRect(x: 0, y: 462, width: 720, height: 438))
+        XCTAssertEqual(br, CGRect(x: 720, y: 462, width: 721, height: 438))
+    }
+
+    func testCornerCyclesWidthAndKeepsHalfHeight() {
+        var last: CycleRecord?
+        var window = CGRect(x: 300, y: 300, width: 500, height: 500)
+        var frames: [CGRect] = []
+        for _ in 0..<3 {
+            let step = Cycle.nextStep(for: .bottomRight, window: window, screen: screen, last: last)
+            window = Cycle.target(for: .bottomRight, step: step, window: window, screen: screen, last: last)!.frame
+            last = CycleRecord(action: .bottomRight, step: step, screen: screen, achieved: window)
+            frames.append(window)
+        }
+        XCTAssertEqual(frames.map(\.width), [721, 961, 481])
+        XCTAssertEqual(frames.map(\.height), [438, 438, 438])
+        XCTAssertTrue(frames.allSatisfy { $0.maxX == screen.maxX && $0.maxY == screen.maxY })
+    }
+
     func testTopCycles() {
         XCTAssertEqual(Cycle.nextStep(for: .topHalf, window: frame(.topHalf, step: 0), screen: screen, last: nil), 1)
         XCTAssertEqual(Cycle.nextStep(for: .bottomHalf, window: frame(.bottomHalf, step: 2), screen: screen, last: nil), 0)

@@ -11,14 +11,19 @@ public enum HyperBindings {
         0x00: .leftHalf,    // A
         0x01: .bottomHalf,  // S
         0x02: .rightHalf,   // D
+        0x0C: .topLeft,     // Q
+        0x0E: .topRight,    // E
+        0x06: .bottomLeft,  // Z
+        0x07: .bottomRight, // X
         0x03: .maximize,    // F
         0x08: .center,      // C
-        0x0E: .nextDisplay, // E
+        0x31: .nextDisplay, // Space
     ]
 
     public static let keyLabels: [TileAction: String] = [
-        .topHalf: "W", .leftHalf: "A", .bottomHalf: "S", .rightHalf: "D", .maximize: "F", .center: "C",
-        .nextDisplay: "E",
+        .topHalf: "W", .leftHalf: "A", .bottomHalf: "S", .rightHalf: "D",
+        .topLeft: "Q", .topRight: "E", .bottomLeft: "Z", .bottomRight: "X",
+        .maximize: "F", .center: "C", .nextDisplay: "Space",
     ]
 
     public static func action(forKeyCode keyCode: Int) -> TileAction? {

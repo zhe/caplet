@@ -25,6 +25,15 @@ struct Shortcut {
         case .bottomHalf:
             return Shortcut(keyCode: kVK_DownArrow, carbonModifiers: ctrlOpt,
                             keyEquivalent: arrow(NSDownArrowFunctionKey), modifierFlags: flags)
+        // U I / J K form a 2×2 grid on the keyboard, matching Rectangle's defaults.
+        case .topLeft:
+            return Shortcut(keyCode: kVK_ANSI_U, carbonModifiers: ctrlOpt, keyEquivalent: "u", modifierFlags: flags)
+        case .topRight:
+            return Shortcut(keyCode: kVK_ANSI_I, carbonModifiers: ctrlOpt, keyEquivalent: "i", modifierFlags: flags)
+        case .bottomLeft:
+            return Shortcut(keyCode: kVK_ANSI_J, carbonModifiers: ctrlOpt, keyEquivalent: "j", modifierFlags: flags)
+        case .bottomRight:
+            return Shortcut(keyCode: kVK_ANSI_K, carbonModifiers: ctrlOpt, keyEquivalent: "k", modifierFlags: flags)
         case .maximize:
             return Shortcut(keyCode: kVK_Return, carbonModifiers: ctrlOpt,
                             keyEquivalent: "\r", modifierFlags: flags)
@@ -78,10 +87,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private static var hyperHintText: String {
         let keys = HyperBindings.keyLabels
-        let wasd = [TileAction.topHalf, .leftHalf, .bottomHalf, .rightHalf].compactMap { keys[$0] }.joined(separator: " ")
-        let others: [(TileAction, String)] = [(.maximize, "maximize"), (.center, "center"), (.nextDisplay, "next display")]
-        let rest = others.map { "\(keys[$0.0] ?? "") \($0.1)" }.joined(separator: " · ")
-        return "Hold Caps Lock + \(wasd) halves · \(rest)"
+        func labels(_ actions: [TileAction]) -> String {
+            actions.compactMap { keys[$0] }.joined(separator: " ")
+        }
+        let groups = [
+            "\(labels([.topHalf, .leftHalf, .bottomHalf, .rightHalf])) halves",
+            "\(labels([.topLeft, .topRight, .bottomLeft, .bottomRight])) corners",
+            "\(labels([.maximize])) maximize",
+            "\(labels([.center])) center",
+            "\(labels([.nextDisplay])) next display",
+        ]
+        return "Hold Caps Lock + " + groups.joined(separator: " · ")
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -125,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.autoenablesItems = false
 
         for action in TileAction.allCases {
+            if action == .topLeft || action == .maximize { menu.addItem(.separator()) }
             let shortcut = Shortcut.shortcut(for: action)
             // Key equivalents here are display-only; the global hotkeys do the real work.
             let item = NSMenuItem(title: action.title, action: #selector(menuAction(_:)),

@@ -8,7 +8,21 @@ final class HyperKeyTests: XCTestCase {
         XCTAssertEqual(HyperBindings.action(forKeyCode: 0x00), .leftHalf)
         XCTAssertEqual(HyperBindings.action(forKeyCode: 0x01), .bottomHalf)
         XCTAssertEqual(HyperBindings.action(forKeyCode: 0x02), .rightHalf)
-        XCTAssertNil(HyperBindings.action(forKeyCode: 0x06)) // Z
+        XCTAssertNil(HyperBindings.action(forKeyCode: 0x05)) // G
+    }
+
+    func testCornersKeepCenterAndFill() {
+        XCTAssertEqual(HyperBindings.action(forKeyCode: 0x0C), .topLeft)     // Q
+        XCTAssertEqual(HyperBindings.action(forKeyCode: 0x0E), .topRight)    // E
+        XCTAssertEqual(HyperBindings.action(forKeyCode: 0x06), .bottomLeft)  // Z
+        XCTAssertEqual(HyperBindings.action(forKeyCode: 0x07), .bottomRight) // X
+        XCTAssertEqual(HyperBindings.action(forKeyCode: 0x08), .center)      // C
+        XCTAssertEqual(HyperBindings.action(forKeyCode: 0x03), .maximize)    // F
+        XCTAssertEqual(HyperBindings.action(forKeyCode: 0x31), .nextDisplay) // Space
+    }
+
+    func testEachKeyHasOneAction() {
+        XCTAssertEqual(Set(HyperBindings.actions.values).count, HyperBindings.actions.count)
     }
 
     func testEveryActionHasAHyperKey() {
