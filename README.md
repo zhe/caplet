@@ -39,12 +39,20 @@ sits at one of those sizes. Otherwise it starts again at the first step. Turn th
 
 ### About Caps Lock
 
-While TinyTiler runs, Caps Lock no longer toggles capitals. Other keys pressed while holding
-Caps Lock type normally. The bound keys are matched by physical position, so they stay under
-your left hand on any keyboard layout.
+Caps Lock still works as Caps Lock:
 
-Quitting TinyTiler gives Caps Lock back and restores any Caps Lock remap you had before. If
-TinyTiler crashes, Caps Lock stays remapped until you relaunch it, log out, or run:
+- **Tap it alone** to toggle capitals, as usual.
+- **Hold it and press a key** for a ⇪ shortcut. Capitals don't toggle.
+
+A press counts as a tap when no other key went down while Caps Lock was held, and it was
+released within half a second. Holding Caps Lock and letting go without pressing anything
+does nothing. Other keys pressed while holding Caps Lock type normally. The bound keys are
+matched by physical position, so they stay under your left hand on any keyboard layout.
+
+Behind the scenes, TinyTiler remaps the Caps Lock key to F18, and it toggles capitals itself
+when you tap. Quitting TinyTiler removes the remap and restores any Caps Lock remap you had
+before. If TinyTiler crashes, Caps Lock stays remapped (no capitals, no shortcuts) until you
+relaunch it, log out, or run:
 
 ```bash
 hidutil property --set '{"UserKeyMapping":[]}'   # also clears any other hidutil remaps

@@ -3,6 +3,7 @@ import TilerCore
 
 /// Caps Lock as a hyper key: hidutil remaps Caps Lock to F18, and a keyboard event tap
 /// treats F18 as held-down modifier, swallowing the bound keys pressed while it is down.
+/// Tapping F18 on its own toggles the real Caps Lock state, so capitals still work.
 /// Active event taps need the same Accessibility permission the window mover uses.
 @MainActor
 final class HyperKeyController {
@@ -19,7 +20,7 @@ final class HyperKeyController {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var retryTimer: Timer?
-    private var hyperDown = false
+    private var capsTap = CapsTap()
     private var displacedMapping: KeyMapping?
 
     init(onAction: @escaping @MainActor (TileAction) -> Void) {
@@ -103,7 +104,7 @@ final class HyperKeyController {
         }
         tap = nil
         runLoopSource = nil
-        hyperDown = false
+        capsTap.reset()
     }
 
     /// Returns true to swallow the event.
@@ -111,16 +112,24 @@ final class HyperKeyController {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             // The F18 key-up may have been lost while disabled; never leave W A S D hijacked.
-            hyperDown = false
+            capsTap.reset()
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return false
         case .keyDown, .keyUp:
             let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+            let now = ProcessInfo.processInfo.systemUptime
             if keyCode == HyperBindings.triggerKeyCode {
-                hyperDown = type == .keyDown
+                if type == .keyDown {
+                    capsTap.pressed(at: now)
+                } else if capsTap.released(at: now) {
+                    // Off the tap callback, like window actions below.
+                    Task { @MainActor in CapsLockState.toggle() }
+                }
                 return true
             }
-            guard hyperDown, let action = HyperBindings.action(forKeyCode: keyCode) else { return false }
+            guard capsTap.isHeld else { return false }
+            if type == .keyDown { capsTap.otherKeyPressed() }
+            guard let action = HyperBindings.action(forKeyCode: keyCode) else { return false }
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             if type == .keyDown, !isRepeat {
                 // Run after returning: a slow Accessibility call inside the tap would get it disabled.
