@@ -91,6 +91,9 @@ A signing certificate avoids that. Neither option needs the paid Apple Developer
   SIGN_IDENTITY="TinyTiler Local" ./scripts/bundle.sh --install
   ```
 
+  If `codesign` rejects it, open the certificate in Keychain Access, expand **Trust**, and
+  set **Code Signing** to **Always Trust**.
+
 The script prints which signature it used. After the first build with a certificate,
 re-add TinyTiler under Accessibility once; later rebuilds keep the permission. Either
 certificate only covers Macs that have it. On other people's Macs, macOS still blocks
@@ -112,8 +115,7 @@ open /Applications/TinyTiler.app
 The setting lives in macOS, and also appears under System Settings › General › Login Items.
 If you switch it off there, the menu shows the checkbox as mixed (–); clicking it opens that
 settings page. Use `--install` for later rebuilds too, so the login item keeps pointing at
-the current build. It quits the running copy first, which restores Caps Lock. Each rebuild
-still needs the Accessibility permission re-added.
+the current build. It quits the running copy first, which restores Caps Lock.
 
 ## Tests
 
