@@ -1,5 +1,5 @@
 import AppKit
-import TilerCore
+import CapletCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -30,7 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem.button?.image = NSImage(systemSymbolName: "rectangle.split.2x1",
-                                           accessibilityDescription: "TinyTiler")
+                                           accessibilityDescription: "Caplet")
         statusItem.menu = buildMenu()
 
         WindowMover.requestTrust()
@@ -82,7 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         permissionItem.target = self
         menu.addItem(permissionItem)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit TinyTiler", action: #selector(NSApplication.terminate(_:)),
+        menu.addItem(NSMenuItem(title: "Quit Caplet", action: #selector(NSApplication.terminate(_:)),
                                 keyEquivalent: "q"))
         return menu
     }
@@ -122,7 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         switch hyperKey.state {
         case .waitingForAccessibility: notes.append("⇪ shortcuts start once Accessibility access is on")
-        case .failed(let reason): notes.append("⇪ shortcuts are off: \(reason). Relaunch TinyTiler to retry")
+        case .failed(let reason): notes.append("⇪ shortcuts are off: \(reason). Relaunch Caplet to retry")
         case .off, .active: break
         }
 
@@ -136,7 +136,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if login == .requiresApproval {
             notes.append("Launch at login is switched off in System Settings › Login Items")
         }
-        if login == .unavailable { notes.append("Launch at login needs TinyTiler.app, not swift run") }
+        if login == .unavailable { notes.append("Launch at login needs Caplet.app, not swift run") }
         if let loginItemError { notes.append(loginItemError) }
 
         statusLine.title = notes.joined(separator: " · ")
@@ -159,7 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             WindowMover.requestTrust()
         } catch {
             NSSound.beep()
-            NSLog("TinyTiler: %@ failed: %@", action.title, String(describing: error))
+            NSLog("Caplet: %@ failed: %@", action.title, String(describing: error))
         }
     }
 
@@ -188,7 +188,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } catch {
             loginItemError = "Couldn't change launch at login: \(error.localizedDescription)"
             NSSound.beep()
-            NSLog("TinyTiler: %@", String(describing: error))
+            NSLog("Caplet: %@", String(describing: error))
         }
     }
 

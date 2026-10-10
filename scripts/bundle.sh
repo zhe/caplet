@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Builds TinyTiler.app in ./build. Running it as an .app (instead of `swift run`) makes
-# macOS attach the Accessibility permission to TinyTiler rather than to your terminal.
+# Builds Caplet.app in ./build. Running it as an .app (instead of `swift run`) makes
+# macOS attach the Accessibility permission to Caplet rather than to your terminal.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-APP="build/TinyTiler.app"
+APP="build/Caplet.app"
 
 swift build -c release
-BIN="$(swift build -c release --show-bin-path)/TinyTiler"
+BIN="$(swift build -c release --show-bin-path)/Caplet"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-cp "$BIN" "$APP/Contents/MacOS/TinyTiler"
+cp "$BIN" "$APP/Contents/MacOS/Caplet"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -19,11 +19,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>dev.tinytiler.TinyTiler</string>
+    <string>net.zhezhang.Caplet</string>
     <key>CFBundleName</key>
-    <string>TinyTiler</string>
+    <string>Caplet</string>
     <key>CFBundleExecutable</key>
-    <string>TinyTiler</string>
+    <string>Caplet</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -63,11 +63,11 @@ else
 fi
 
 if [[ "${1:-}" == "--install" ]]; then
-    # TinyTiler handles SIGTERM like Quit, so it restores Caps Lock before being replaced.
-    if pkill -x TinyTiler; then
-        for _ in {1..25}; do pgrep -x TinyTiler >/dev/null || break; sleep 0.2; done
+    # Caplet handles SIGTERM like Quit, so it restores Caps Lock before being replaced.
+    if pkill -x Caplet; then
+        for _ in {1..25}; do pgrep -x Caplet >/dev/null || break; sleep 0.2; done
     fi
-    rm -rf /Applications/TinyTiler.app
+    rm -rf /Applications/Caplet.app
     cp -R "$APP" /Applications/
-    echo "Installed /Applications/TinyTiler.app"
+    echo "Installed /Applications/Caplet.app"
 fi

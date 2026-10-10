@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import TilerCore
+@testable import CapletCore
 
 final class CycleTests: XCTestCase {
     private let screen = CGRect(x: 0, y: 25, width: 1441, height: 875)

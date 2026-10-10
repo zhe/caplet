@@ -1,6 +1,6 @@
 import AppKit
 import ApplicationServices
-import TilerCore
+import CapletCore
 
 enum TileError: Error, CustomStringConvertible {
     case notTrusted
@@ -12,7 +12,7 @@ enum TileError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .notTrusted: return "TinyTiler needs Accessibility access."
+        case .notTrusted: return "Caplet needs Accessibility access."
         case .noFocusedWindow: return "The frontmost app has no focused window."
         case .fullScreen: return "Full-screen windows can't be tiled."
         case .noScreens: return "No displays found."

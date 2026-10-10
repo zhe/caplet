@@ -1,4 +1,4 @@
-# TinyTiler
+# Caplet
 
 A tiny macOS menu-bar window manager. It moves the focused window of whatever app is in front.
 
@@ -49,9 +49,9 @@ released within half a second. Holding Caps Lock and letting go without pressing
 does nothing. Other keys pressed while holding Caps Lock type normally. The bound keys are
 matched by physical position, so they stay under your left hand on any keyboard layout.
 
-Behind the scenes, TinyTiler remaps the Caps Lock key to F18, and it toggles capitals itself
-when you tap. Quitting TinyTiler removes the remap and restores any Caps Lock remap you had
-before. If TinyTiler crashes, Caps Lock stays remapped (no capitals, no shortcuts) until you
+Behind the scenes, Caplet remaps the Caps Lock key to F18, and it toggles capitals itself
+when you tap. Quitting Caplet removes the remap and restores any Caps Lock remap you had
+before. If Caplet crashes, Caps Lock stays remapped (no capitals, no shortcuts) until you
 relaunch it, log out, or run:
 
 ```bash
@@ -64,10 +64,10 @@ Requires macOS 13+ and Xcode 15+ (or the matching Command Line Tools).
 
 ```bash
 ./scripts/bundle.sh
-open build/TinyTiler.app
+open build/Caplet.app
 ```
 
-On first launch macOS asks for **Accessibility** access. Enable TinyTiler in
+On first launch macOS asks for **Accessibility** access. Enable Caplet in
 System Settings › Privacy & Security › Accessibility. Until you do, the menu shows a
 "Grant Accessibility Access…" item. The ⇪ shortcuts start by themselves a couple of seconds
 after you grant it.
@@ -75,7 +75,7 @@ after you grant it.
 ### Signing
 
 Without a signing certificate, the bundle is ad-hoc signed, and macOS treats every rebuild
-as a new app. Shortcuts then stop working after each rebuild until you remove TinyTiler from
+as a new app. Shortcuts then stop working after each rebuild until you remove Caplet from
 the Accessibility list (the `–` button) and add it again.
 
 A signing certificate avoids that. Neither option needs the paid Apple Developer Program:
@@ -86,22 +86,22 @@ A signing certificate avoids that. Neither option needs the paid Apple Developer
   signed", macOS is missing Apple's intermediate certificate; the script prints the
   one-line command that installs it.
 - **Self-made certificate (no Apple account):** in Keychain Access › Certificate Assistant ›
-  **Create a Certificate…**, give it a name (e.g. `TinyTiler Local`), set **Certificate
+  **Create a Certificate…**, give it a name (e.g. `Caplet Local`), set **Certificate
   Type** to **Code Signing**, and create it. Then tell the script to use it:
 
   ```bash
-  SIGN_IDENTITY="TinyTiler Local" ./scripts/bundle.sh --install
+  SIGN_IDENTITY="Caplet Local" ./scripts/bundle.sh --install
   ```
 
   If `codesign` rejects it, open the certificate in Keychain Access, expand **Trust**, and
   set **Code Signing** to **Always Trust**.
 
 The script prints which signature it used. After the first build with a certificate,
-re-add TinyTiler under Accessibility once; later rebuilds keep the permission. Either
+re-add Caplet under Accessibility once; later rebuilds keep the permission. Either
 certificate only covers Macs that have it. On other people's Macs, macOS still blocks
 the download until they choose **Open Anyway** in System Settings › Privacy & Security.
 
-`swift run TinyTiler` also works for quick iteration, but then macOS asks to grant
+`swift run Caplet` also works for quick iteration, but then macOS asks to grant
 Accessibility access to your terminal app instead.
 
 ### Launch at login
@@ -111,7 +111,7 @@ menu (off by default):
 
 ```bash
 ./scripts/bundle.sh --install
-open /Applications/TinyTiler.app
+open /Applications/Caplet.app
 ```
 
 The setting lives in macOS, and also appears under System Settings › General › Login Items.
@@ -125,7 +125,7 @@ the current build. It quits the running copy first, which restores Caps Lock.
 swift test
 ```
 
-The tests cover `TilerCore`: coordinate flipping, halves, size cycling, picking a screen,
+The tests cover `CapletCore`: coordinate flipping, halves, size cycling, picking a screen,
 moving between displays, ⇪ key bindings, and the `hidutil` remap handling. That module is
 plain Foundation, so the tests also run on Linux.
 
@@ -133,22 +133,22 @@ plain Foundation, so the tests also run on Linux.
 
 | File | Role |
 |---|---|
-| `Sources/TilerCore/Layout.swift` | Pure geometry, all in Accessibility coordinates (top-left origin of the primary display, y down). |
-| `Sources/TilerCore/Cycle.swift` | Picks the next size for repeated presses (halves, quarters, and center). It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
-| `Sources/TinyTiler/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
-| `Sources/TilerCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
-| `Sources/TinyTiler/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
-| `Sources/TilerCore/CapsTap.swift` | Tells a tap of Caps Lock (toggle capitals) apart from holding it for a shortcut. |
-| `Sources/TinyTiler/CapsLockState.swift` | Flips the system Caps Lock state through IOHIDSystem, the same state the physical key toggles. |
-| `Sources/TinyTiler/LoginItem.swift` | Launch at login through `SMAppService.mainApp`. |
-| `Sources/TinyTiler/AppDelegate.swift` | Menu-bar item, menu, and shortcut wiring. |
+| `Sources/CapletCore/Layout.swift` | Pure geometry, all in Accessibility coordinates (top-left origin of the primary display, y down). |
+| `Sources/CapletCore/Cycle.swift` | Picks the next size for repeated presses (halves, quarters, and center). It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
+| `Sources/Caplet/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
+| `Sources/CapletCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
+| `Sources/Caplet/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
+| `Sources/CapletCore/CapsTap.swift` | Tells a tap of Caps Lock (toggle capitals) apart from holding it for a shortcut. |
+| `Sources/Caplet/CapsLockState.swift` | Flips the system Caps Lock state through IOHIDSystem, the same state the physical key toggles. |
+| `Sources/Caplet/LoginItem.swift` | Launch at login through `SMAppService.mainApp`. |
+| `Sources/Caplet/AppDelegate.swift` | Menu-bar item, menu, and shortcut wiring. |
 
 Details handled:
 
 - `NSScreen` frames use a bottom-left origin; Accessibility uses top-left. `Layout.flip` converts between them.
 - The size is set before and after the position, so windows aren't clamped to the old screen when they cross displays.
 - `AXEnhancedUserInterface` is turned off for the duration of a move. When it's on, apps animate frame changes slowly.
-- Accessibility calls time out after 1 second, so a hung app can't freeze TinyTiler.
+- Accessibility calls time out after 1 second, so a hung app can't freeze Caplet.
 - Full-screen windows are skipped, and the app beeps.
 
 ## Not included

@@ -10,7 +10,7 @@ enum LoginItem {
         case disabled
         /// Registered, but the user switched it off in System Settings.
         case requiresApproval
-        /// Running from `swift run` rather than TinyTiler.app, so there is nothing to register.
+        /// Running from `swift run` rather than Caplet.app, so there is nothing to register.
         case unavailable
     }
 

@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import TilerCore
+@testable import CapletCore
 
 final class CapsTapTests: XCTestCase {
     func testQuickPressAloneIsATap() {

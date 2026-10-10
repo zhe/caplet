@@ -1,5 +1,5 @@
 import AppKit
-import TilerCore
+import CapletCore
 
 /// Caps Lock as a hyper key: hidutil remaps Caps Lock to F18, and a keyboard event tap
 /// treats F18 as held-down modifier, swallowing the bound keys pressed while it is down.

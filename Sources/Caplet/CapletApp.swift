@@ -1,7 +1,7 @@
 import AppKit
 
 @main
-enum TinyTilerApp {
+enum CapletApp {
     @MainActor
     static func main() {
         let app = NSApplication.shared

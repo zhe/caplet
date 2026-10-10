@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "TinyTiler",
+    name: "Caplet",
     platforms: [.macOS(.v13)],
     targets: [
-        .target(name: "TilerCore"),
-        .executableTarget(name: "TinyTiler", dependencies: ["TilerCore"]),
-        .testTarget(name: "TilerCoreTests", dependencies: ["TilerCore"]),
+        .target(name: "CapletCore"),
+        .executableTarget(name: "Caplet", dependencies: ["CapletCore"]),
+        .testTarget(name: "CapletCoreTests", dependencies: ["CapletCore"]),
     ]
 )
