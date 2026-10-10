@@ -34,7 +34,9 @@ enum WindowMover {
         AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
     }
 
-    static func perform(_ action: TileAction) throws {
+    private static var lastCycle: (window: AXUIElement, record: CycleRecord)?
+
+    static func perform(_ action: TileAction, cycling: Bool) throws {
         guard isTrusted else { throw TileError.notTrusted }
         guard let app = NSWorkspace.shared.frontmostApplication else { throw TileError.noFocusedWindow }
 
@@ -54,16 +56,29 @@ enum WindowMover {
         let screens = NSScreen.screens.map { Layout.flip($0.visibleFrame, primaryHeight: primaryHeight) }
         guard let index = Layout.screenIndex(for: current, in: screens) else { throw TileError.noScreens }
 
+        let screen = screens[index]
+        var step = 0
+        if cycling, Cycle.supports(action) {
+            let last = lastCycle.flatMap { CFEqual($0.window, window) ? $0.record : nil }
+            step = Cycle.nextStep(for: action, window: current, screen: screen, last: last)
+        }
+
         let target: CGRect
-        if let single = Layout.frame(for: action, in: screens[index]) {
+        if let single = Layout.frame(for: action, in: screen, fraction: Cycle.fractions[step]) {
             target = single
         } else {
             guard screens.count > 1 else { throw TileError.singleDisplay }
-            target = Layout.move(current, from: screens[index], to: screens[(index + 1) % screens.count])
+            target = Layout.move(current, from: screen, to: screens[(index + 1) % screens.count])
         }
 
         try withEnhancedUIDisabled(appElement) {
             try setFrame(of: window, to: target)
+        }
+
+        if Cycle.supports(action), let achieved = try? frame(of: window) {
+            lastCycle = (window, CycleRecord(action: action, step: step, screen: screen, achieved: achieved))
+        } else {
+            lastCycle = nil
         }
     }
 

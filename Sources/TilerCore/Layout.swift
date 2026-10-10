@@ -29,15 +29,17 @@ public enum Layout {
     }
 
     /// Target frame for a single-screen action inside `visible` (the screen's visible frame).
+    /// `fraction` is the share of the screen width used by `.leftHalf` / `.rightHalf`.
     /// Returns nil for `.nextDisplay`, which needs a destination screen; use `move(_:from:to:)`.
-    public static func frame(for action: TileAction, in visible: CGRect) -> CGRect? {
-        let leftWidth = (visible.width / 2).rounded(.down)
+    public static func frame(for action: TileAction, in visible: CGRect, fraction: CGFloat = 1.0 / 2) -> CGRect? {
         switch action {
         case .leftHalf:
-            return CGRect(x: visible.minX, y: visible.minY, width: leftWidth, height: visible.height)
+            let width = (visible.width * fraction).rounded(.down)
+            return CGRect(x: visible.minX, y: visible.minY, width: width, height: visible.height)
         case .rightHalf:
-            return CGRect(x: visible.minX + leftWidth, y: visible.minY,
-                          width: visible.width - leftWidth, height: visible.height)
+            // Complement of the left frame with fraction (1 - f), so left ⅓ + right ⅔ tile exactly.
+            let width = visible.width - (visible.width * (1 - fraction)).rounded(.down)
+            return CGRect(x: visible.maxX - width, y: visible.minY, width: width, height: visible.height)
         case .maximize:
             return visible
         case .nextDisplay:
@@ -84,6 +86,11 @@ public enum Layout {
         let x = min(max(rect.minX, bounds.minX), bounds.maxX - width)
         let y = min(max(rect.minY, bounds.minY), bounds.maxY - height)
         return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    static func approximatelyEqual(_ a: CGRect, _ b: CGRect, tolerance: CGFloat = 2) -> Bool {
+        abs(a.minX - b.minX) <= tolerance && abs(a.minY - b.minY) <= tolerance
+            && abs(a.width - b.width) <= tolerance && abs(a.height - b.height) <= tolerance
     }
 
     private static func distanceSquared(_ point: CGPoint, _ rect: CGRect) -> CGFloat {

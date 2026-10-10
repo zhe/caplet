@@ -40,6 +40,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let permissionItem = NSMenuItem(title: "Grant Accessibility Access…",
                                             action: #selector(openAccessibilitySettings), keyEquivalent: "")
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let cycleItem = NSMenuItem(title: "Cycle ½ → ⅔ → ⅓ on Repeat",
+                                       action: #selector(toggleCycling), keyEquivalent: "")
+
+    private static let cyclingKey = "cycleSizes"
+    private var cyclingEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: Self.cyclingKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: Self.cyclingKey) }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -75,6 +83,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
+        cycleItem.target = self
+        menu.addItem(cycleItem)
+
+        menu.addItem(.separator())
         statusLine.isEnabled = false
         statusLine.isHidden = true
         menu.addItem(statusLine)
@@ -89,6 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         let trusted = WindowMover.isTrusted
         permissionItem.isHidden = trusted
+        cycleItem.state = cyclingEnabled ? .on : .off
 
         var notes: [String] = []
         if !trusted { notes.append("Accessibility access is off") }
@@ -111,13 +124,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func run(_ action: TileAction) {
         do {
-            try WindowMover.perform(action)
+            try WindowMover.perform(action, cycling: cyclingEnabled)
         } catch TileError.notTrusted {
             WindowMover.requestTrust()
         } catch {
             NSSound.beep()
             NSLog("TinyTiler: %@ failed: %@", action.title, String(describing: error))
         }
+    }
+
+    @objc private func toggleCycling() {
+        cyclingEnabled.toggle()
     }
 
     @objc private func openAccessibilitySettings() {

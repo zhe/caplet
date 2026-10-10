@@ -11,6 +11,11 @@ A tiny macOS menu-bar window manager. It moves the focused window of whatever ap
 
 The same actions are in the menu-bar icon's menu.
 
+Pressing ⌃⌥← or ⌃⌥→ again cycles the window width through ½ → ⅔ → ⅓ → ½. A repeated
+press advances when the window is still where the last press put it, or already sits at one
+of those sizes. Otherwise it starts again at ½. Turn this off with **Cycle ½ → ⅔ → ⅓ on
+Repeat** in the menu.
+
 Requires macOS 13+ and Xcode 15+ (or the matching Command Line Tools).
 
 ## Run it
