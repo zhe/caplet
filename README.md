@@ -50,6 +50,7 @@ and moving between displays. That module is plain Foundation, so the tests also 
 | File | Role |
 |---|---|
 | `Sources/TilerCore/Layout.swift` | Pure geometry, all in Accessibility coordinates (top-left origin of the primary display, y down). |
+| `Sources/TilerCore/Cycle.swift` | Picks the next width in the ½ → ⅔ → ⅓ cycle. It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
 | `Sources/TinyTiler/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
 | `Sources/TinyTiler/HotKeyCenter.swift` | Global shortcuts through Carbon `RegisterEventHotKey`, which needs no extra permission. |
 | `Sources/TinyTiler/AppDelegate.swift` | Menu-bar item, menu, and shortcut wiring. |
