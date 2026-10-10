@@ -14,19 +14,8 @@ final class HotKeyCenter {
     init() {
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard),
                                  eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
-            guard let event, let userData else { return OSStatus(eventNotHandledErr) }
-            var hotKeyID = EventHotKeyID()
-            let status = GetEventParameter(event, EventParamName(kEventParamDirectObject),
-                                           EventParamType(typeEventHotKeyID), nil,
-                                           MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
-            guard status == noErr else { return status }
-            let id = hotKeyID.id
-            let center = Unmanaged<HotKeyCenter>.fromOpaque(userData).takeUnretainedValue()
-            // Carbon delivers application-target events on the main thread.
-            MainActor.assumeIsolated { center.fire(id) }
-            return noErr
-        }, 1, &spec, Unmanaged.passUnretained(self).toOpaque(), &handlerRef)
+        InstallEventHandler(GetApplicationEventTarget(), hotKeyHandler, 1, &spec,
+                            Unmanaged.passUnretained(self).toOpaque(), &handlerRef)
     }
 
     /// Returns false when the combo is already taken by another app (eventHotKeyExistsErr).
@@ -43,7 +32,21 @@ final class HotKeyCenter {
         return true
     }
 
-    private func fire(_ id: UInt32) {
+    fileprivate func fire(_ id: UInt32) {
         actions[id]?()
     }
+}
+
+private func hotKeyHandler(_: EventHandlerCallRef?, event: EventRef?, userData: UnsafeMutableRawPointer?) -> OSStatus {
+    guard let event, let userData else { return OSStatus(eventNotHandledErr) }
+    var hotKeyID = EventHotKeyID()
+    let status = GetEventParameter(event, EventParamName(kEventParamDirectObject),
+                                   EventParamType(typeEventHotKeyID), nil,
+                                   MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+    guard status == noErr else { return status }
+    let id = hotKeyID.id
+    let center = Unmanaged<HotKeyCenter>.fromOpaque(userData).takeUnretainedValue()
+    // Carbon delivers application-target events on the main thread.
+    MainActor.assumeIsolated { center.fire(id) }
+    return noErr
 }

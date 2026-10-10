@@ -93,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         var notes: [String] = []
         if !trusted { notes.append("Accessibility access is off") }
         if !unavailableShortcuts.isEmpty {
-            let names = TileAction.allCases.filter(unavailableShortcuts.contains).map(\.title)
+            let names = TileAction.allCases.filter { unavailableShortcuts.contains($0) }.map(\.title)
             notes.append("Shortcut taken by another app: \(names.joined(separator: ", "))")
         }
         statusLine.title = notes.joined(separator: " · ")
