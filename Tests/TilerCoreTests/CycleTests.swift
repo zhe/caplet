@@ -21,6 +21,23 @@ final class CycleTests: XCTestCase {
         XCTAssertEqual(rightThird.maxX, screen.maxX)
     }
 
+    func testTopAndBottomTileWithoutGaps() {
+        let top = Layout.frame(for: .topHalf, in: screen)!
+        let bottom = Layout.frame(for: .bottomHalf, in: screen)!
+        XCTAssertEqual(top, CGRect(x: 0, y: 25, width: 1441, height: 437))
+        XCTAssertEqual(bottom, CGRect(x: 0, y: 462, width: 1441, height: 438))
+
+        let topThird = Layout.frame(for: .topHalf, in: screen, fraction: 1.0 / 3)!
+        let bottomTwoThirds = Layout.frame(for: .bottomHalf, in: screen, fraction: 2.0 / 3)!
+        XCTAssertEqual(topThird.maxY, bottomTwoThirds.minY)
+        XCTAssertEqual(bottomTwoThirds.maxY, screen.maxY)
+    }
+
+    func testTopCycles() {
+        XCTAssertEqual(Cycle.nextStep(for: .topHalf, window: frame(.topHalf, step: 0), screen: screen, last: nil), 1)
+        XCTAssertEqual(Cycle.nextStep(for: .bottomHalf, window: frame(.bottomHalf, step: 2), screen: screen, last: nil), 0)
+    }
+
     func testUntiledWindowStartsAtHalf() {
         let window = CGRect(x: 200, y: 200, width: 600, height: 400)
         XCTAssertEqual(Cycle.nextStep(for: .leftHalf, window: window, screen: screen, last: nil), 0)

@@ -21,11 +21,14 @@ public struct CycleRecord: Equatable, Sendable {
 }
 
 public enum Cycle {
-    /// Widths visited by repeated left/right presses, in order.
+    /// Widths (left/right) or heights (top/bottom) visited by repeated presses, in order.
     public static let fractions: [CGFloat] = [1.0 / 2, 2.0 / 3, 1.0 / 3]
 
     public static func supports(_ action: TileAction) -> Bool {
-        action == .leftHalf || action == .rightHalf
+        switch action {
+        case .leftHalf, .rightHalf, .topHalf, .bottomHalf: return true
+        case .maximize, .nextDisplay: return false
+        }
     }
 
     /// Picks the cycle step for this press.

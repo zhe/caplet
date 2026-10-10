@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import TilerCore
 
+/// Fallback ⌃⌥ shortcuts, registered through Carbon. They work even when the hyper key is off.
 struct Shortcut {
     let keyCode: Int
     let carbonModifiers: Int
@@ -10,16 +11,23 @@ struct Shortcut {
 
     static func shortcut(for action: TileAction) -> Shortcut {
         let ctrlOpt = controlKey | optionKey
+        let flags: NSEvent.ModifierFlags = [.control, .option]
         switch action {
         case .leftHalf:
             return Shortcut(keyCode: kVK_LeftArrow, carbonModifiers: ctrlOpt,
-                            keyEquivalent: arrow(NSLeftArrowFunctionKey), modifierFlags: [.control, .option])
+                            keyEquivalent: arrow(NSLeftArrowFunctionKey), modifierFlags: flags)
         case .rightHalf:
             return Shortcut(keyCode: kVK_RightArrow, carbonModifiers: ctrlOpt,
-                            keyEquivalent: arrow(NSRightArrowFunctionKey), modifierFlags: [.control, .option])
+                            keyEquivalent: arrow(NSRightArrowFunctionKey), modifierFlags: flags)
+        case .topHalf:
+            return Shortcut(keyCode: kVK_UpArrow, carbonModifiers: ctrlOpt,
+                            keyEquivalent: arrow(NSUpArrowFunctionKey), modifierFlags: flags)
+        case .bottomHalf:
+            return Shortcut(keyCode: kVK_DownArrow, carbonModifiers: ctrlOpt,
+                            keyEquivalent: arrow(NSDownArrowFunctionKey), modifierFlags: flags)
         case .maximize:
             return Shortcut(keyCode: kVK_Return, carbonModifiers: ctrlOpt,
-                            keyEquivalent: "\r", modifierFlags: [.control, .option])
+                            keyEquivalent: "\r", modifierFlags: flags)
         case .nextDisplay:
             return Shortcut(keyCode: kVK_RightArrow, carbonModifiers: ctrlOpt | cmdKey,
                             keyEquivalent: arrow(NSRightArrowFunctionKey),
@@ -36,17 +44,35 @@ struct Shortcut {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let hotKeys = HotKeyCenter()
+    private lazy var hyperKey = HyperKeyController { [weak self] action in self?.run(action) }
     private var unavailableShortcuts: Set<TileAction> = []
+
     private let permissionItem = NSMenuItem(title: "Grant Accessibility Access…",
                                             action: #selector(openAccessibilitySettings), keyEquivalent: "")
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let cycleItem = NSMenuItem(title: "Cycle ½ → ⅔ → ⅓ on Repeat",
                                        action: #selector(toggleCycling), keyEquivalent: "")
+    private let hyperItem = NSMenuItem(title: "Caps Lock as Hyper Key",
+                                       action: #selector(toggleHyperKey), keyEquivalent: "")
+    private let hyperHint = NSMenuItem(title: AppDelegate.hyperHintText, action: nil, keyEquivalent: "")
 
     private static let cyclingKey = "cycleSizes"
+    private static let hyperKeyDefaultsKey = "capsLockHyperKey"
+
     private var cyclingEnabled: Bool {
         get { UserDefaults.standard.object(forKey: Self.cyclingKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: Self.cyclingKey) }
+    }
+
+    private var hyperKeyEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: Self.hyperKeyDefaultsKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: Self.hyperKeyDefaultsKey) }
+    }
+
+    private static var hyperHintText: String {
+        let keys = HyperBindings.keyLabels
+        let wasd = [TileAction.topHalf, .leftHalf, .bottomHalf, .rightHalf].compactMap { keys[$0] }.joined(separator: " ")
+        return "Hold Caps Lock + \(wasd) halves · \(keys[.maximize] ?? "") maximize · \(keys[.nextDisplay] ?? "") next display"
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -64,6 +90,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         WindowMover.requestTrust()
+        if hyperKeyEnabled { hyperKey.start() }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        hyperKey.stop()
     }
 
     private func buildMenu() -> NSMenu {
@@ -83,6 +114,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         menu.addItem(.separator())
+        hyperItem.target = self
+        menu.addItem(hyperItem)
+        hyperHint.isEnabled = false
+        menu.addItem(hyperHint)
         cycleItem.target = self
         menu.addItem(cycleItem)
 
@@ -102,9 +137,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let trusted = WindowMover.isTrusted
         permissionItem.isHidden = trusted
         cycleItem.state = cyclingEnabled ? .on : .off
+        hyperItem.state = hyperKeyEnabled ? .on : .off
+        hyperHint.isHidden = hyperKey.state != .active
 
         var notes: [String] = []
         if !trusted { notes.append("Accessibility access is off") }
+        switch hyperKey.state {
+        case .waitingForAccessibility: notes.append("Hyper key starts once Accessibility access is on")
+        case .failed(let reason): notes.append("Hyper key off: \(reason)")
+        case .off, .active: break
+        }
         if !unavailableShortcuts.isEmpty {
             let names = TileAction.allCases.filter { unavailableShortcuts.contains($0) }.map(\.title)
             notes.append("Shortcut taken by another app: \(names.joined(separator: ", "))")
@@ -135,6 +177,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleCycling() {
         cyclingEnabled.toggle()
+    }
+
+    @objc private func toggleHyperKey() {
+        hyperKeyEnabled.toggle()
+        if hyperKeyEnabled { hyperKey.start() } else { hyperKey.stop() }
     }
 
     @objc private func openAccessibilitySettings() {
