@@ -57,7 +57,7 @@ else
         echo
         echo "Note: an Apple Development certificate exists but macOS doesn't trust it yet,"
         echo "usually because Apple's intermediate certificate is missing. Install it with:"
-        echo "  curl -fsSLO https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer && open AppleWWDRCAG3.cer"
+        echo "  curl -fsSL -o /tmp/AppleWWDRCAG3.cer https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer && open /tmp/AppleWWDRCAG3.cer"
         echo "then run this script again."
     fi
 fi
