@@ -2,21 +2,21 @@
 
 A tiny macOS menu-bar window manager. It moves the focused window of whatever app is in front.
 
-Hold **Caps Lock** and press a key with the same hand:
+Hold **Caps Lock** (⇪) and press a key with the same hand:
 
-| Action | Hyper key | Fallback |
-|---|---|---|
-| Top half | Caps Lock + W | ⌃⌥↑ |
-| Left half | Caps Lock + A | ⌃⌥← |
-| Bottom half | Caps Lock + S | ⌃⌥↓ |
-| Right half | Caps Lock + D | ⌃⌥→ |
-| Top-left quarter | Caps Lock + Q | ⌃⌥U |
-| Top-right quarter | Caps Lock + E | ⌃⌥I |
-| Bottom-left quarter | Caps Lock + Z | ⌃⌥J |
-| Bottom-right quarter | Caps Lock + X | ⌃⌥K |
-| Maximize (fill the visible screen) | Caps Lock + F | ⌃⌥↩ |
-| Center, keeping the window's size (shrunk only if it doesn't fit) | Caps Lock + C | ⌃⌥C |
-| Move to next display, keeping its relative size and position | Caps Lock + Space | ⌃⌥⌘→ |
+| Action | Shortcut |
+|---|---|
+| Top half | ⇪W |
+| Left half | ⇪A |
+| Bottom half | ⇪S |
+| Right half | ⇪D |
+| Top-left quarter | ⇪Q |
+| Top-right quarter | ⇪E |
+| Bottom-left quarter | ⇪Z |
+| Bottom-right quarter | ⇪X |
+| Maximize (fill the visible screen) | ⇪F |
+| Center, keeping the window's size (shrunk only if it doesn't fit) | ⇪C |
+| Move to next display, keeping its relative size and position | ⇪Space |
 
 ```
 Q  W  E        ↖  ↑  ↗
@@ -24,9 +24,7 @@ Q  W  E        ↖  ↑  ↗
   Z  X  C       ↙  ↘  center
 ```
 
-The fallback shortcuts always work, even with the hyper key turned off. The same actions are
-also in the menu-bar icon's menu. Next to each item, the menu shows the shortcut that's in
-use: "Hyper A" style labels while the hyper key is active, and the ⌃⌥ shortcuts otherwise.
+The same actions, with their shortcuts, are also in the menu-bar icon's menu.
 
 Repeated presses cycle sizes:
 
@@ -39,15 +37,14 @@ A repeated press advances when the window is still where the last press put it, 
 sits at one of those sizes. Otherwise it starts again at the first step. Turn this off with
 **Cycle Sizes on Repeated Presses** in the menu.
 
-### About the hyper key
+### About Caps Lock
 
-While TinyTiler runs with **Caps Lock as Hyper Key** on (the default), Caps Lock no longer
-toggles capitals. Other keys pressed while holding Caps Lock type normally. The bound keys
-are matched by physical position, so they stay under your left hand on any keyboard layout.
+While TinyTiler runs, Caps Lock no longer toggles capitals. Other keys pressed while holding
+Caps Lock type normally. The bound keys are matched by physical position, so they stay under
+your left hand on any keyboard layout.
 
-Turning the option off in the menu, or quitting TinyTiler, gives Caps Lock back and restores
-any Caps Lock remap you had before. If TinyTiler crashes, Caps Lock stays remapped until you
-relaunch it, log out, or run:
+Quitting TinyTiler gives Caps Lock back and restores any Caps Lock remap you had before. If
+TinyTiler crashes, Caps Lock stays remapped until you relaunch it, log out, or run:
 
 ```bash
 hidutil property --set '{"UserKeyMapping":[]}'   # also clears any other hidutil remaps
@@ -64,8 +61,8 @@ open build/TinyTiler.app
 
 On first launch macOS asks for **Accessibility** access. Enable TinyTiler in
 System Settings › Privacy & Security › Accessibility. Until you do, the menu shows a
-"Grant Accessibility Access…" item. The hyper key uses the same permission and starts by
-itself a couple of seconds after you grant it.
+"Grant Accessibility Access…" item. The ⇪ shortcuts start by themselves a couple of seconds
+after you grant it.
 
 The bundle is ad-hoc signed, so macOS treats every rebuild as a new app. If shortcuts stop
 working after a rebuild, remove TinyTiler from the Accessibility list (the `–` button) and
@@ -97,7 +94,7 @@ swift test
 ```
 
 The tests cover `TilerCore`: coordinate flipping, halves, size cycling, picking a screen,
-moving between displays, hyper-key bindings, and the `hidutil` remap handling. That module is
+moving between displays, ⇪ key bindings, and the `hidutil` remap handling. That module is
 plain Foundation, so the tests also run on Linux.
 
 ## How it works
@@ -109,7 +106,6 @@ plain Foundation, so the tests also run on Linux.
 | `Sources/TinyTiler/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
 | `Sources/TilerCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
 | `Sources/TinyTiler/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
-| `Sources/TinyTiler/HotKeyCenter.swift` | Fallback ⌃⌥ shortcuts through Carbon `RegisterEventHotKey`, which needs no extra permission. |
 | `Sources/TinyTiler/LoginItem.swift` | Launch at login through `SMAppService.mainApp`. |
 | `Sources/TinyTiler/AppDelegate.swift` | Menu-bar item, menu, and shortcut wiring. |
 

@@ -1,92 +1,30 @@
 import AppKit
-import Carbon.HIToolbox
 import TilerCore
-
-/// Fallback ⌃⌥ shortcuts, registered through Carbon. They work even when the hyper key is off.
-struct Shortcut {
-    let keyCode: Int
-    let carbonModifiers: Int
-    let keyEquivalent: String
-    let modifierFlags: NSEvent.ModifierFlags
-
-    static func shortcut(for action: TileAction) -> Shortcut {
-        let ctrlOpt = controlKey | optionKey
-        let flags: NSEvent.ModifierFlags = [.control, .option]
-        switch action {
-        case .leftHalf:
-            return Shortcut(keyCode: kVK_LeftArrow, carbonModifiers: ctrlOpt,
-                            keyEquivalent: arrow(NSLeftArrowFunctionKey), modifierFlags: flags)
-        case .rightHalf:
-            return Shortcut(keyCode: kVK_RightArrow, carbonModifiers: ctrlOpt,
-                            keyEquivalent: arrow(NSRightArrowFunctionKey), modifierFlags: flags)
-        case .topHalf:
-            return Shortcut(keyCode: kVK_UpArrow, carbonModifiers: ctrlOpt,
-                            keyEquivalent: arrow(NSUpArrowFunctionKey), modifierFlags: flags)
-        case .bottomHalf:
-            return Shortcut(keyCode: kVK_DownArrow, carbonModifiers: ctrlOpt,
-                            keyEquivalent: arrow(NSDownArrowFunctionKey), modifierFlags: flags)
-        // U I / J K form a 2×2 grid on the keyboard, matching Rectangle's defaults.
-        case .topLeft:
-            return Shortcut(keyCode: kVK_ANSI_U, carbonModifiers: ctrlOpt, keyEquivalent: "u", modifierFlags: flags)
-        case .topRight:
-            return Shortcut(keyCode: kVK_ANSI_I, carbonModifiers: ctrlOpt, keyEquivalent: "i", modifierFlags: flags)
-        case .bottomLeft:
-            return Shortcut(keyCode: kVK_ANSI_J, carbonModifiers: ctrlOpt, keyEquivalent: "j", modifierFlags: flags)
-        case .bottomRight:
-            return Shortcut(keyCode: kVK_ANSI_K, carbonModifiers: ctrlOpt, keyEquivalent: "k", modifierFlags: flags)
-        case .maximize:
-            return Shortcut(keyCode: kVK_Return, carbonModifiers: ctrlOpt,
-                            keyEquivalent: "\r", modifierFlags: flags)
-        case .center:
-            return Shortcut(keyCode: kVK_ANSI_C, carbonModifiers: ctrlOpt,
-                            keyEquivalent: "c", modifierFlags: flags)
-        case .nextDisplay:
-            return Shortcut(keyCode: kVK_RightArrow, carbonModifiers: ctrlOpt | cmdKey,
-                            keyEquivalent: arrow(NSRightArrowFunctionKey),
-                            modifierFlags: [.control, .option, .command])
-        }
-    }
-
-    private static func arrow(_ key: Int) -> String {
-        String(Character(UnicodeScalar(UInt16(key))!))
-    }
-}
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
-    private let hotKeys = HotKeyCenter()
     private lazy var hyperKey = HyperKeyController { [weak self] action in self?.run(action) }
-    private var unavailableShortcuts: Set<TileAction> = []
 
     private let permissionItem = NSMenuItem(title: "Grant Accessibility Access…",
                                             action: #selector(openAccessibilitySettings), keyEquivalent: "")
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let cycleItem = NSMenuItem(title: "Cycle Sizes on Repeated Presses",
                                        action: #selector(toggleCycling), keyEquivalent: "")
-    private let hyperItem = NSMenuItem(title: "Caps Lock as Hyper Key",
-                                       action: #selector(toggleHyperKey), keyEquivalent: "")
-    private var actionItems: [TileAction: NSMenuItem] = [:]
     private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin),
                                        keyEquivalent: "")
     private var loginItemError: String?
     private var terminationSignal: DispatchSourceSignal?
 
     private static let cyclingKey = "cycleSizes"
-    private static let hyperKeyDefaultsKey = "capsLockHyperKey"
 
     private var cyclingEnabled: Bool {
         get { UserDefaults.standard.object(forKey: Self.cyclingKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: Self.cyclingKey) }
     }
 
-    private var hyperKeyEnabled: Bool {
-        get { UserDefaults.standard.object(forKey: Self.hyperKeyDefaultsKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: Self.hyperKeyDefaultsKey) }
-    }
-
-    private static func hyperLabel(for action: TileAction) -> String? {
-        HyperBindings.keyLabels[action].map { "Hyper \($0)" }
+    private static func shortcutLabel(for action: TileAction) -> String? {
+        HyperBindings.keyLabels[action].map { "⇪\($0)" }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -95,16 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                            accessibilityDescription: "TinyTiler")
         statusItem.menu = buildMenu()
 
-        for action in TileAction.allCases {
-            let shortcut = Shortcut.shortcut(for: action)
-            let ok = hotKeys.register(keyCode: shortcut.keyCode, modifiers: shortcut.carbonModifiers) { [weak self] in
-                self?.run(action)
-            }
-            if !ok { unavailableShortcuts.insert(action) }
-        }
-
         WindowMover.requestTrust()
-        if hyperKeyEnabled { hyperKey.start() }
+        hyperKey.start()
         quitOnSIGTERM()
     }
 
@@ -129,19 +59,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
 
+        let paragraph = shortcutParagraphStyle()
         for action in TileAction.allCases {
             if action == .topLeft || action == .maximize { menu.addItem(.separator()) }
             let item = NSMenuItem(title: action.title, action: #selector(menuAction(_:)), keyEquivalent: "")
+            item.attributedTitle = titleWithShortcut(for: action, paragraph: paragraph)
             item.representedObject = action.rawValue
             item.target = self
             menu.addItem(item)
-            actionItems[action] = item
         }
-        showShortcuts(hyper: false)
 
         menu.addItem(.separator())
-        hyperItem.target = self
-        menu.addItem(hyperItem)
         cycleItem.target = self
         menu.addItem(cycleItem)
         loginItem.target = self
@@ -159,15 +87,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return menu
     }
 
+    // Key equivalents only accept real modifiers (⌃⌥⇧⌘), so the ⇪ shortcut is drawn into the
+    // title after a right-aligned tab stop, styled like a native shortcut column.
+    private func shortcutParagraphStyle() -> NSParagraphStyle {
+        let font = NSFont.menuFont(ofSize: 0)
+        func width(_ text: String) -> CGFloat {
+            (text as NSString).size(withAttributes: [.font: font]).width
+        }
+        let titleWidth = TileAction.allCases.map { width($0.title) }.max() ?? 0
+        let labelWidth = TileAction.allCases.compactMap(Self.shortcutLabel(for:)).map(width).max() ?? 0
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.tabStops = [NSTextTab(textAlignment: .right, location: ceil(titleWidth + 48 + labelWidth))]
+        return paragraph
+    }
+
+    private func titleWithShortcut(for action: TileAction, paragraph: NSParagraphStyle) -> NSAttributedString? {
+        guard let label = Self.shortcutLabel(for: action) else { return nil }
+        let font = NSFont.menuFont(ofSize: 0)
+        let title = NSMutableAttributedString(string: action.title + "\t",
+                                              attributes: [.font: font, .paragraphStyle: paragraph])
+        title.append(NSAttributedString(string: label, attributes: [
+            .font: font, .paragraphStyle: paragraph, .foregroundColor: NSColor.secondaryLabelColor,
+        ]))
+        return title
+    }
+
     func menuNeedsUpdate(_ menu: NSMenu) {
         let trusted = WindowMover.isTrusted
         permissionItem.isHidden = trusted
         cycleItem.state = cyclingEnabled ? .on : .off
-        hyperItem.state = hyperKeyEnabled ? .on : .off
-        showShortcuts(hyper: hyperKey.state == .active)
 
         var notes: [String] = []
         if !trusted { notes.append("Accessibility access is off") }
+
+        switch hyperKey.state {
+        case .waitingForAccessibility: notes.append("⇪ shortcuts start once Accessibility access is on")
+        case .failed(let reason): notes.append("⇪ shortcuts are off: \(reason). Relaunch TinyTiler to retry")
+        case .off, .active: break
+        }
 
         let login = LoginItem.state
         loginItem.isEnabled = login != .unavailable
@@ -182,59 +139,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if login == .unavailable { notes.append("Launch at login needs TinyTiler.app, not swift run") }
         if let loginItemError { notes.append(loginItemError) }
 
-        switch hyperKey.state {
-        case .waitingForAccessibility: notes.append("Hyper key starts once Accessibility access is on")
-        case .failed(let reason): notes.append("Hyper key off: \(reason)")
-        case .off, .active: break
-        }
-        if !unavailableShortcuts.isEmpty {
-            let names = TileAction.allCases.filter { unavailableShortcuts.contains($0) }.map(\.title)
-            notes.append("Shortcut taken by another app: \(names.joined(separator: ", "))")
-        }
         statusLine.title = notes.joined(separator: " · ")
         statusLine.isHidden = notes.isEmpty
 
         for item in menu.items {
             if item.representedObject is String { item.isEnabled = trusted }
-        }
-    }
-
-    /// Shows whichever shortcuts currently work. Key equivalents are display-only (the global
-    /// hotkeys and the hyper key do the real work), and they only accept real modifiers, so
-    /// "Hyper X" is drawn into the title after a right-aligned tab stop instead.
-    private func showShortcuts(hyper: Bool) {
-        guard hyper else {
-            for (action, item) in actionItems {
-                let shortcut = Shortcut.shortcut(for: action)
-                item.attributedTitle = nil
-                item.keyEquivalent = shortcut.keyEquivalent
-                item.keyEquivalentModifierMask = shortcut.modifierFlags
-            }
-            return
-        }
-
-        let font = NSFont.menuFont(ofSize: 0)
-        func width(_ text: String) -> CGFloat {
-            (text as NSString).size(withAttributes: [.font: font]).width
-        }
-        let titleWidth = actionItems.keys.map { width($0.title) }.max() ?? 0
-        let labelWidth = actionItems.keys.compactMap { Self.hyperLabel(for: $0) }.map(width).max() ?? 0
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.tabStops = [NSTextTab(textAlignment: .right, location: ceil(titleWidth + 48 + labelWidth))]
-
-        for (action, item) in actionItems {
-            item.keyEquivalent = ""
-            item.keyEquivalentModifierMask = []
-            guard let label = Self.hyperLabel(for: action) else {
-                item.attributedTitle = nil
-                continue
-            }
-            let title = NSMutableAttributedString(string: action.title + "\t",
-                                                  attributes: [.font: font, .paragraphStyle: paragraph])
-            title.append(NSAttributedString(string: label, attributes: [
-                .font: font, .paragraphStyle: paragraph, .foregroundColor: NSColor.secondaryLabelColor,
-            ]))
-            item.attributedTitle = title
         }
     }
 
@@ -256,11 +165,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func toggleCycling() {
         cyclingEnabled.toggle()
-    }
-
-    @objc private func toggleHyperKey() {
-        hyperKeyEnabled.toggle()
-        if hyperKeyEnabled { hyperKey.start() } else { hyperKey.stop() }
     }
 
     @objc private func toggleLaunchAtLogin() {
