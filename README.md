@@ -102,7 +102,7 @@ plain Foundation, so the tests also run on Linux.
 | File | Role |
 |---|---|
 | `Sources/TilerCore/Layout.swift` | Pure geometry, all in Accessibility coordinates (top-left origin of the primary display, y down). |
-| `Sources/TilerCore/Cycle.swift` | Picks the next size for repeated presses (halves and center). It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
+| `Sources/TilerCore/Cycle.swift` | Picks the next size for repeated presses (halves, quarters, and center). It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
 | `Sources/TinyTiler/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
 | `Sources/TilerCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
 | `Sources/TinyTiler/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
