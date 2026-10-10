@@ -56,6 +56,22 @@ add it again.
 `swift run TinyTiler` also works for quick iteration, but then macOS asks to grant
 Accessibility access to your terminal app instead.
 
+### Launch at login
+
+Install the app into `/Applications`, open it from there, and tick **Launch at Login** in the
+menu (off by default):
+
+```bash
+./scripts/bundle.sh --install
+open /Applications/TinyTiler.app
+```
+
+The setting lives in macOS, and also appears under System Settings › General › Login Items.
+If you switch it off there, the menu shows the checkbox as mixed (–); clicking it opens that
+settings page. Use `--install` for later rebuilds too, so the login item keeps pointing at
+the current build. It quits the running copy first, which restores Caps Lock. Each rebuild
+still needs the Accessibility permission re-added.
+
 ## Tests
 
 ```bash
@@ -76,6 +92,7 @@ plain Foundation, so the tests also run on Linux.
 | `Sources/TilerCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
 | `Sources/TinyTiler/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
 | `Sources/TinyTiler/HotKeyCenter.swift` | Fallback ⌃⌥ shortcuts through Carbon `RegisterEventHotKey`, which needs no extra permission. |
+| `Sources/TinyTiler/LoginItem.swift` | Launch at login through `SMAppService.mainApp`. |
 | `Sources/TinyTiler/AppDelegate.swift` | Menu-bar item, menu, and shortcut wiring. |
 
 Details handled:

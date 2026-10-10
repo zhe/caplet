@@ -40,3 +40,13 @@ PLIST
 
 codesign --force --sign - "$APP"
 echo "Built $APP"
+
+if [[ "${1:-}" == "--install" ]]; then
+    # TinyTiler handles SIGTERM like Quit, so it restores Caps Lock before being replaced.
+    if pkill -x TinyTiler; then
+        for _ in {1..25}; do pgrep -x TinyTiler >/dev/null || break; sleep 0.2; done
+    fi
+    rm -rf /Applications/TinyTiler.app
+    cp -R "$APP" /Applications/
+    echo "Installed /Applications/TinyTiler.app"
+fi

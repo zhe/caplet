@@ -55,6 +55,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let hyperItem = NSMenuItem(title: "Caps Lock as Hyper Key",
                                        action: #selector(toggleHyperKey), keyEquivalent: "")
     private let hyperHint = NSMenuItem(title: AppDelegate.hyperHintText, action: nil, keyEquivalent: "")
+    private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin),
+                                       keyEquivalent: "")
+    private var loginItemError: String?
+    private var terminationSignal: DispatchSourceSignal?
 
     private static let cyclingKey = "cycleSizes"
     private static let hyperKeyDefaultsKey = "capsLockHyperKey"
@@ -91,6 +95,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         WindowMover.requestTrust()
         if hyperKeyEnabled { hyperKey.start() }
+        quitOnSIGTERM()
+    }
+
+    /// `kill` and `pkill` send SIGTERM, which would otherwise skip
+    /// applicationWillTerminate and leave Caps Lock remapped to F18.
+    private func quitOnSIGTERM() {
+        signal(SIGTERM, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        source.setEventHandler {
+            MainActor.assumeIsolated { NSApp.terminate(nil) }
+        }
+        source.resume()
+        terminationSignal = source
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -120,6 +137,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(hyperHint)
         cycleItem.target = self
         menu.addItem(cycleItem)
+        loginItem.target = self
+        menu.addItem(loginItem)
 
         menu.addItem(.separator())
         statusLine.isEnabled = false
@@ -142,6 +161,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         var notes: [String] = []
         if !trusted { notes.append("Accessibility access is off") }
+
+        let login = LoginItem.state
+        loginItem.isEnabled = login != .unavailable
+        switch login {
+        case .enabled: loginItem.state = .on
+        case .requiresApproval: loginItem.state = .mixed
+        case .disabled, .unavailable: loginItem.state = .off
+        }
+        if login == .requiresApproval {
+            notes.append("Launch at login is switched off in System Settings › Login Items")
+        }
+        if login == .unavailable { notes.append("Launch at login needs TinyTiler.app, not swift run") }
+        if let loginItemError { notes.append(loginItemError) }
+
         switch hyperKey.state {
         case .waitingForAccessibility: notes.append("Hyper key starts once Accessibility access is on")
         case .failed(let reason): notes.append("Hyper key off: \(reason)")
@@ -182,6 +215,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleHyperKey() {
         hyperKeyEnabled.toggle()
         if hyperKeyEnabled { hyperKey.start() } else { hyperKey.stop() }
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        switch LoginItem.state {
+        case .requiresApproval:
+            // Registering again won't help; only the user can flip it back on.
+            LoginItem.openSystemSettings()
+        case .enabled:
+            setLaunchAtLogin(false)
+        case .disabled:
+            setLaunchAtLogin(true)
+        case .unavailable:
+            break
+        }
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try LoginItem.setEnabled(enabled)
+            loginItemError = nil
+        } catch {
+            loginItemError = "Couldn't change launch at login: \(error.localizedDescription)"
+            NSSound.beep()
+            NSLog("TinyTiler: %@", String(describing: error))
+        }
     }
 
     @objc private func openAccessibilitySettings() {
