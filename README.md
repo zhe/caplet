@@ -82,7 +82,9 @@ A signing certificate avoids that. Neither option needs the paid Apple Developer
 
 - **Apple Development certificate (free Apple account):** in Xcode › Settings › Accounts,
   sign in, select your team, click **Manage Certificates…**, then **+** › **Apple
-  Development**. `bundle.sh` finds it automatically.
+  Development**. `bundle.sh` finds it automatically. If the script still says "ad-hoc
+  signed", macOS is missing Apple's intermediate certificate; the script prints the
+  one-line command that installs it.
 - **Self-made certificate (no Apple account):** in Keychain Access › Certificate Assistant ›
   **Create a Certificate…**, give it a name (e.g. `TinyTiler Local`), set **Certificate
   Type** to **Code Signing**, and create it. Then tell the script to use it:

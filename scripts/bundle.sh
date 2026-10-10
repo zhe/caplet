@@ -53,6 +53,13 @@ else
     codesign --force --sign - "$APP"
     echo "Built $APP (ad-hoc signed: re-add it under Accessibility after each rebuild;"
     echo "see \"Signing\" in README.md to avoid that)"
+    if security find-identity -p codesigning 2>/dev/null | grep -q '"Apple Development: '; then
+        echo
+        echo "Note: an Apple Development certificate exists but macOS doesn't trust it yet,"
+        echo "usually because Apple's intermediate certificate is missing. Install it with:"
+        echo "  curl -fsSLO https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer && open AppleWWDRCAG3.cer"
+        echo "then run this script again."
+    fi
 fi
 
 if [[ "${1:-}" == "--install" ]]; then
