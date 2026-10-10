@@ -38,8 +38,22 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-codesign --force --sign - "$APP"
-echo "Built $APP"
+# A real certificate lets macOS recognise rebuilds as the same app, so the Accessibility
+# permission survives them. Ad-hoc signatures change with every build.
+IDENTITY="${SIGN_IDENTITY:-}"
+if [[ -z "$IDENTITY" ]]; then
+    IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
+        | awk -F'"' '/"Apple Development: / { print $2; exit }')"
+fi
+
+if [[ -n "$IDENTITY" ]]; then
+    codesign --force --sign "$IDENTITY" "$APP"
+    echo "Built $APP (signed with \"$IDENTITY\")"
+else
+    codesign --force --sign - "$APP"
+    echo "Built $APP (ad-hoc signed: re-add it under Accessibility after each rebuild;"
+    echo "see \"Signing\" in README.md to avoid that)"
+fi
 
 if [[ "${1:-}" == "--install" ]]; then
     # TinyTiler handles SIGTERM like Quit, so it restores Caps Lock before being replaced.

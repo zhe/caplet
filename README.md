@@ -72,9 +72,29 @@ System Settings › Privacy & Security › Accessibility. Until you do, the menu
 "Grant Accessibility Access…" item. The ⇪ shortcuts start by themselves a couple of seconds
 after you grant it.
 
-The bundle is ad-hoc signed, so macOS treats every rebuild as a new app. If shortcuts stop
-working after a rebuild, remove TinyTiler from the Accessibility list (the `–` button) and
-add it again.
+### Signing
+
+Without a signing certificate, the bundle is ad-hoc signed, and macOS treats every rebuild
+as a new app. Shortcuts then stop working after each rebuild until you remove TinyTiler from
+the Accessibility list (the `–` button) and add it again.
+
+A signing certificate avoids that. Neither option needs the paid Apple Developer Program:
+
+- **Apple Development certificate (free Apple account):** in Xcode › Settings › Accounts,
+  sign in, select your team, click **Manage Certificates…**, then **+** › **Apple
+  Development**. `bundle.sh` finds it automatically.
+- **Self-made certificate (no Apple account):** in Keychain Access › Certificate Assistant ›
+  **Create a Certificate…**, give it a name (e.g. `TinyTiler Local`), set **Certificate
+  Type** to **Code Signing**, and create it. Then tell the script to use it:
+
+  ```bash
+  SIGN_IDENTITY="TinyTiler Local" ./scripts/bundle.sh --install
+  ```
+
+The script prints which signature it used. After the first build with a certificate,
+re-add TinyTiler under Accessibility once; later rebuilds keep the permission. Either
+certificate only covers Macs that have it. On other people's Macs, macOS still blocks
+the download until they choose **Open Anyway** in System Settings › Privacy & Security.
 
 `swift run TinyTiler` also works for quick iteration, but then macOS asks to grant
 Accessibility access to your terminal app instead.
@@ -114,6 +134,8 @@ plain Foundation, so the tests also run on Linux.
 | `Sources/TinyTiler/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
 | `Sources/TilerCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
 | `Sources/TinyTiler/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
+| `Sources/TilerCore/CapsTap.swift` | Tells a tap of Caps Lock (toggle capitals) apart from holding it for a shortcut. |
+| `Sources/TinyTiler/CapsLockState.swift` | Flips the system Caps Lock state through IOHIDSystem, the same state the physical key toggles. |
 | `Sources/TinyTiler/LoginItem.swift` | Launch at login through `SMAppService.mainApp`. |
 | `Sources/TinyTiler/AppDelegate.swift` | Menu-bar item, menu, and shortcut wiring. |
 
