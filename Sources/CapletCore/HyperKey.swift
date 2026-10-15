@@ -26,9 +26,37 @@ public enum HyperBindings {
         .maximize: "F", .center: "C", .nextDisplay: "Space",
     ]
 
+    /// With ⌥ also held, the same keys arrange the windows behind the focused one too.
+    public static let arrangeActions: [Int: ArrangeAction] = [
+        0x00: .leftAndRight,            // A
+        0x02: .rightAndLeft,            // D
+        0x0D: .topAndBottom,            // W
+        0x01: .bottomAndTop,            // S
+        0x0C: .quartersFromTopLeft,     // Q
+        0x0E: .quartersFromTopRight,    // E
+        0x06: .quartersFromBottomLeft,  // Z
+        0x07: .quartersFromBottomRight, // X
+    ]
+
     public static func action(forKeyCode keyCode: Int) -> TileAction? {
         actions[keyCode]
     }
+
+    /// ⌥ with a key that has no arrange binding (⇪⌥F) falls back to the plain action.
+    public static func command(forKeyCode keyCode: Int, option: Bool) -> HyperCommand? {
+        if option, let arrange = arrangeActions[keyCode] { return .arrange(arrange) }
+        return actions[keyCode].map(HyperCommand.tile)
+    }
+
+    /// The key for an arrange action, e.g. "A" for Left & Right.
+    public static func keyLabel(for arrange: ArrangeAction) -> String? {
+        arrangeActions.first { $0.value == arrange }.flatMap { actions[$0.key] }.flatMap { keyLabels[$0] }
+    }
+}
+
+public enum HyperCommand: Equatable, Sendable {
+    case tile(TileAction)
+    case arrange(ArrangeAction)
 }
 
 /// One entry of hidutil's `UserKeyMapping` (HID usage page << 32 | usage).

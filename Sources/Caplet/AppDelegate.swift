@@ -4,7 +4,7 @@ import CapletCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
-    private lazy var hyperKey = HyperKeyController { [weak self] action in self?.run(action) }
+    private lazy var hyperKey = HyperKeyController { [weak self] command in self?.run(command) }
 
     private let permissionItem = NSMenuItem(title: "Grant Accessibility Access…",
                                             action: #selector(openAccessibilitySettings), keyEquivalent: "")
@@ -25,6 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private static func shortcutLabel(for action: TileAction) -> String? {
         HyperBindings.keyLabels[action].map { "⇪\($0)" }
+    }
+
+    private static func shortcutLabel(for action: ArrangeAction) -> String? {
+        HyperBindings.keyLabel(for: action).map { "⇪⌥\($0)" }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -63,7 +67,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for action in TileAction.allCases {
             if action == .topLeft || action == .maximize { menu.addItem(.separator()) }
             let item = NSMenuItem(title: action.title, action: #selector(menuAction(_:)), keyEquivalent: "")
-            item.attributedTitle = titleWithShortcut(for: action, paragraph: paragraph)
+            item.attributedTitle = titleWithShortcut(action.title, Self.shortcutLabel(for: action), paragraph)
+            item.representedObject = action.rawValue
+            item.target = self
+            menu.addItem(item)
+        }
+
+        menu.addItem(.separator())
+        menu.addItem(sectionHeader("Arrange"))
+        for action in ArrangeAction.menuCases {
+            let item = NSMenuItem(title: action.title, action: #selector(arrangeAction(_:)), keyEquivalent: "")
+            item.attributedTitle = titleWithShortcut(action.title, Self.shortcutLabel(for: action), paragraph)
             item.representedObject = action.rawValue
             item.target = self
             menu.addItem(item)
@@ -94,17 +108,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         func width(_ text: String) -> CGFloat {
             (text as NSString).size(withAttributes: [.font: font]).width
         }
-        let titleWidth = TileAction.allCases.map { width($0.title) }.max() ?? 0
-        let labelWidth = TileAction.allCases.compactMap(Self.shortcutLabel(for:)).map(width).max() ?? 0
+        let titles = TileAction.allCases.map(\.title) + ArrangeAction.menuCases.map(\.title)
+        let labels = TileAction.allCases.compactMap { Self.shortcutLabel(for: $0) }
+            + ArrangeAction.menuCases.compactMap { Self.shortcutLabel(for: $0) }
+        let titleWidth = titles.map(width).max() ?? 0
+        let labelWidth = labels.map(width).max() ?? 0
         let paragraph = NSMutableParagraphStyle()
         paragraph.tabStops = [NSTextTab(textAlignment: .right, location: ceil(titleWidth + 48 + labelWidth))]
         return paragraph
     }
 
-    private func titleWithShortcut(for action: TileAction, paragraph: NSParagraphStyle) -> NSAttributedString? {
-        guard let label = Self.shortcutLabel(for: action) else { return nil }
+    private func sectionHeader(_ title: String) -> NSMenuItem {
+        if #available(macOS 14, *) { return .sectionHeader(title: title) }
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        return item
+    }
+
+    private func titleWithShortcut(_ text: String, _ label: String?,
+                                   _ paragraph: NSParagraphStyle) -> NSAttributedString? {
+        guard let label else { return nil }
         let font = NSFont.menuFont(ofSize: 0)
-        let title = NSMutableAttributedString(string: action.title + "\t",
+        let title = NSMutableAttributedString(string: text + "\t",
                                               attributes: [.font: font, .paragraphStyle: paragraph])
         title.append(NSAttributedString(string: label, attributes: [
             .font: font, .paragraphStyle: paragraph, .foregroundColor: NSColor.secondaryLabelColor,
@@ -149,17 +174,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func menuAction(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let action = TileAction(rawValue: raw) else { return }
-        run(action)
+        run(.tile(action))
     }
 
-    private func run(_ action: TileAction) {
+    @objc private func arrangeAction(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let action = ArrangeAction(rawValue: raw) else { return }
+        run(.arrange(action))
+    }
+
+    private func run(_ command: HyperCommand) {
         do {
-            try WindowMover.perform(action, cycling: cyclingEnabled)
+            switch command {
+            case .tile(let action): try WindowMover.perform(action, cycling: cyclingEnabled)
+            case .arrange(let action): try WindowMover.arrange(action)
+            }
         } catch TileError.notTrusted {
             WindowMover.requestTrust()
         } catch {
             NSSound.beep()
-            NSLog("Caplet: %@ failed: %@", action.title, String(describing: error))
+            NSLog("Caplet: %@ failed: %@", String(describing: command), String(describing: error))
         }
     }
 

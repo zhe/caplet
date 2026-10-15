@@ -15,7 +15,7 @@ final class HyperKeyController {
     }
 
     private(set) var state: State = .off
-    private let onAction: @MainActor (TileAction) -> Void
+    private let onCommand: @MainActor (HyperCommand) -> Void
 
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -23,8 +23,8 @@ final class HyperKeyController {
     private var capsTap = CapsTap()
     private var displacedMapping: KeyMapping?
 
-    init(onAction: @escaping @MainActor (TileAction) -> Void) {
-        self.onAction = onAction
+    init(onCommand: @escaping @MainActor (HyperCommand) -> Void) {
+        self.onCommand = onCommand
     }
 
     func start() {
@@ -129,11 +129,12 @@ final class HyperKeyController {
             }
             guard capsTap.isHeld else { return false }
             if type == .keyDown { capsTap.otherKeyPressed() }
-            guard let action = HyperBindings.action(forKeyCode: keyCode) else { return false }
+            let option = event.flags.contains(.maskAlternate)
+            guard let command = HyperBindings.command(forKeyCode: keyCode, option: option) else { return false }
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             if type == .keyDown, !isRepeat {
                 // Run after returning: a slow Accessibility call inside the tap would get it disabled.
-                Task { @MainActor [weak self] in self?.onAction(action) }
+                Task { @MainActor [weak self] in self?.onCommand(command) }
             }
             return true
         default:

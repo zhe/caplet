@@ -52,8 +52,7 @@ enum WindowMover {
         }
         let current = try frame(of: window)
 
-        guard let primaryHeight = NSScreen.screens.first?.frame.height else { throw TileError.noScreens }
-        let screens = NSScreen.screens.map { Layout.flip($0.visibleFrame, primaryHeight: primaryHeight) }
+        let screens = try visibleScreens()
         guard let index = Layout.screenIndex(for: current, in: screens) else { throw TileError.noScreens }
 
         let screen = screens[index]
@@ -82,6 +81,64 @@ enum WindowMover {
         } else {
             lastCycle = nil
         }
+    }
+
+    /// Tiles the focused window into the first slot and the windows right behind it on the
+    /// same display into the rest. Nothing is raised, so focus and stacking stay as they were.
+    static func arrange(_ action: ArrangeAction) throws {
+        guard isTrusted else { throw TileError.notTrusted }
+        guard let app = NSWorkspace.shared.frontmostApplication else { throw TileError.noFocusedWindow }
+        let pid = app.processIdentifier
+
+        let appElement = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(appElement, 1.0)
+        guard let window: AXUIElement = copyAttribute(appElement, kAXFocusedWindowAttribute) else {
+            throw TileError.noFocusedWindow
+        }
+        if let fullScreen: Bool = copyAttribute(window, "AXFullScreen"), fullScreen {
+            throw TileError.fullScreen
+        }
+        let current = try frame(of: window)
+
+        let screens = try visibleScreens()
+        guard let index = Layout.screenIndex(for: current, in: screens) else { throw TileError.noScreens }
+
+        let onScreen = WindowList.frontToBack()
+        // The frontmost app's top window is the focused one in practice.
+        let focusedID = WindowList.windowID(of: window) ?? onScreen.first { $0.pid == pid }?.id ?? 0
+        let focused = WindowSnapshot(id: focusedID, pid: pid, frame: current)
+
+        var followers: [(app: AXUIElement, window: AXUIElement)] = []
+        var apps: [pid_t: WindowList.App] = [:]
+        for candidate in Arrange.followers(of: focused, frontToBack: onScreen, screens: screens,
+                                           excludingPID: getpid()) {
+            guard followers.count < action.slots.count - 1 else { break }
+            let owner = apps[candidate.pid] ?? WindowList.app(pid: candidate.pid)
+            apps[candidate.pid] = owner
+            if let match = owner.windows[candidate.id] { followers.append((owner.element, match)) }
+        }
+
+        let frames = Arrange.frames(for: action, windowCount: followers.count + 1, in: screens[index])
+        guard let first = frames.first else { return }
+        try withEnhancedUIDisabled(appElement) {
+            try setFrame(of: window, to: first)
+        }
+        for (follower, target) in zip(followers, frames.dropFirst()) {
+            do {
+                try withEnhancedUIDisabled(follower.app) {
+                    try setFrame(of: follower.window, to: target)
+                }
+            } catch {
+                NSLog("Caplet: couldn't arrange a window: %@", String(describing: error))
+            }
+        }
+        lastCycle = nil
+    }
+
+    /// Visible frames (without menu bar and Dock) in Accessibility coordinates.
+    private static func visibleScreens() throws -> [CGRect] {
+        guard let primaryHeight = NSScreen.screens.first?.frame.height else { throw TileError.noScreens }
+        return NSScreen.screens.map { Layout.flip($0.visibleFrame, primaryHeight: primaryHeight) }
     }
 
     private static func frame(of window: AXUIElement) throws -> CGRect {
@@ -119,7 +176,7 @@ enum WindowMover {
         try body()
     }
 
-    private static func copyAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {
+    static func copyAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else {
             return nil

@@ -37,6 +37,30 @@ A repeated press advances when the window is still where the last press put it, 
 sits at one of those sizes. Otherwise it starts again at the first step. Turn this off with
 **Cycle Sizes on Repeated Presses** in the menu.
 
+### Arrange
+
+Add **Option** (⌥) to tile the focused window together with the windows right behind it,
+like Window › Move & Resize › Arrange in macOS Sequoia:
+
+| Arrange | Shortcut | Focused window goes |
+|---|---|---|
+| Left & Right | ⇪⌥A | left; the next window goes right |
+| Right & Left | ⇪⌥D | right; the next window goes left |
+| Top & Bottom | ⇪⌥W | top; the next window goes bottom |
+| Bottom & Top | ⇪⌥S | bottom; the next window goes top |
+| Quarters | ⇪⌥Q / ⇪⌥E / ⇪⌥Z / ⇪⌥X | into that corner; the next three windows fill the other corners in reading order |
+
+- "Behind" means the stacking order, so the windows you used most recently join first.
+  They can come from any app.
+- Only windows on the focused window's display take part. Minimized windows, hidden apps,
+  other Spaces, dialogs, panels, and very small windows are skipped.
+- With fewer windows than slots, the windows that exist are tiled and the rest of the
+  screen stays empty.
+- Nothing is brought to the front, so focus stays where it was. Arrange doesn't cycle sizes.
+- ⌥ with F, C, or Space does the same thing as without it.
+
+The menu lists the Arrange layouts too. Its **Quarters** item puts the focused window top-left.
+
 ### About Caps Lock
 
 Caps Lock still works as Caps Lock:
@@ -126,7 +150,8 @@ swift test
 ```
 
 The tests cover `CapletCore`: coordinate flipping, halves, size cycling, picking a screen,
-moving between displays, ⇪ key bindings, and the `hidutil` remap handling. That module is
+moving between displays, picking and placing windows for Arrange, ⇪ key bindings, and the
+`hidutil` remap handling. That module is
 plain Foundation, so the tests also run on Linux.
 
 ## How it works
@@ -136,6 +161,8 @@ plain Foundation, so the tests also run on Linux.
 | `Sources/CapletCore/Layout.swift` | Pure geometry, all in Accessibility coordinates (top-left origin of the primary display, y down). |
 | `Sources/CapletCore/Cycle.swift` | Picks the next size for repeated presses (halves, quarters, and center). It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
 | `Sources/Caplet/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
+| `Sources/CapletCore/Arrange.swift` | Arrange layouts: which slot each window gets, and which windows behind the focused one may join. |
+| `Sources/Caplet/WindowList.swift` | Lists on-screen windows front to back (`CGWindowListCopyWindowInfo`) and matches them to Accessibility windows by window ID. |
 | `Sources/CapletCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
 | `Sources/Caplet/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
 | `Sources/CapletCore/CapsTap.swift` | Tells a tap of Caps Lock (toggle capitals) apart from holding it for a shortcut. |
@@ -150,7 +177,11 @@ Details handled:
 - `AXEnhancedUserInterface` is turned off for the duration of a move. When it's on, apps animate frame changes slowly.
 - Accessibility calls time out after 1 second, so a hung app can't freeze Caplet.
 - Full-screen windows are skipped, and the app beeps.
+- Arrange matches windows with the private `_AXUIElementGetWindow`. Most window managers use
+  it, and it has been stable for years. Window titles, which would need Screen Recording
+  access, are never read.
 
 ## Not included
 
-Spaces, Stage Manager, and tiling layouts. Spaces have no public API.
+Spaces, Stage Manager, and automatic tiling (windows rearranging themselves as they open or
+close). Spaces have no public API.
