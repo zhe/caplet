@@ -84,6 +84,13 @@ hidutil property --set '{"UserKeyMapping":[]}'   # also clears any other hidutil
 
 Requires macOS 13+ and Xcode 15+ (or the matching Command Line Tools).
 
+If `swift build` fails with `Invalid manifest` and `Undefined symbols ... PackageDescription`,
+the Command Line Tools are out of sync with macOS (common after an OS upgrade). Reinstall them:
+
+```bash
+sudo rm -rf /Library/Developer/CommandLineTools && xcode-select --install
+```
+
 ## Run it
 
 ```bash
@@ -121,9 +128,8 @@ A signing certificate avoids that. Neither option needs the paid Apple Developer
   set **Code Signing** to **Always Trust**.
 
 The script prints which signature it used. After the first build with a certificate,
-re-add Caplet under Accessibility once; later rebuilds keep the permission. Either
-certificate only covers Macs that have it. On other people's Macs, macOS still blocks
-the download until they choose **Open Anyway** in System Settings › Privacy & Security.
+re-add Caplet under Accessibility once; later rebuilds keep the permission. To run the app
+on Macs that don't build it, see [Other Macs](#other-macs).
 
 `swift run Caplet` also works for quick iteration, but then macOS asks to grant
 Accessibility access to your terminal app instead.
@@ -142,6 +148,35 @@ The setting lives in macOS, and also appears under System Settings › General �
 If you switch it off there, the menu shows the checkbox as mixed (–); clicking it opens that
 settings page. Use `--install` for later rebuilds too, so the login item keeps pointing at
 the current build. It quits the running copy first, which restores Caps Lock.
+
+### Other Macs
+
+Other Macs don't need Xcode or the source. Build once, then copy the app:
+
+```bash
+./scripts/bundle.sh --zip      # writes build/Caplet.zip
+```
+
+Send `Caplet.zip` over AirDrop, a shared folder, or a drive. On the other Mac:
+
+1. Unzip it and drag `Caplet.app` into `/Applications`.
+2. Open it. The app isn't notarized (that needs the paid Developer Program), so macOS
+   refuses the first time. Go to System Settings › Privacy & Security, scroll down, and
+   click **Open Anyway** next to the Caplet message. Alternatively, clear the download flag
+   from Terminal before opening it:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Caplet.app
+   ```
+
+3. Grant Accessibility access, and turn on Launch at Login if you want it.
+
+To update, copy a newer zip and replace the app the same way. Quit Caplet from its menu
+first, so Caps Lock goes back to normal while you swap it. With the same signing certificate,
+the other Mac keeps its Accessibility permission across updates. Ad-hoc builds need to be
+re-added under Accessibility each time.
+
+The build only runs on the kind of chip it was built on (Apple silicon or Intel).
 
 ## Tests
 

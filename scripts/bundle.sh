@@ -3,6 +3,16 @@
 # macOS attach the Accessibility permission to Caplet rather than to your terminal.
 set -euo pipefail
 
+INSTALL=0
+ZIP=0
+for arg in "$@"; do
+    case "$arg" in
+        --install) INSTALL=1 ;;
+        --zip) ZIP=1 ;;
+        *) echo "usage: $0 [--install] [--zip]" >&2; exit 64 ;;
+    esac
+done
+
 cd "$(dirname "$0")/.."
 APP="build/Caplet.app"
 
@@ -62,7 +72,14 @@ else
     fi
 fi
 
-if [[ "${1:-}" == "--install" ]]; then
+if [[ "$ZIP" == 1 ]]; then
+    # ditto keeps the code signature intact; Finder's Compress does too, plain `zip` may not.
+    rm -f build/Caplet.zip
+    ditto -c -k --keepParent "$APP" build/Caplet.zip
+    echo "Packed build/Caplet.zip (copy it to another Mac; see \"Other Macs\" in README.md)"
+fi
+
+if [[ "$INSTALL" == 1 ]]; then
     # Caplet handles SIGTERM like Quit, so it restores Caps Lock before being replaced.
     if pkill -x Caplet; then
         for _ in {1..25}; do pgrep -x Caplet >/dev/null || break; sleep 0.2; done
