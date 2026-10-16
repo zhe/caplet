@@ -6,8 +6,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     targets: [
         .target(name: "CapletCore"),
-        .executableTarget(name: "Caplet", dependencies: ["CapletCore"],
-                          resources: [.process("Resources")]),
+        .executableTarget(name: "Caplet", dependencies: ["CapletCore"]),
         .testTarget(name: "CapletCoreTests", dependencies: ["CapletCore"]),
     ]
 )

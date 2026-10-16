@@ -22,8 +22,9 @@ BIN="$(swift build -c release --show-bin-path)/Caplet"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Caplet"
-cp -R "$(dirname "$BIN")/Caplet_Caplet.bundle" "$APP/Contents/Resources/"
-cp Sources/Caplet/Resources/AppIcon.icns "$APP/Contents/Resources/"
+# Copied straight into Contents/Resources, where Bundle.main finds them. SwiftPM resources
+# (Bundle.module) would look in the .app's root, which codesign doesn't allow.
+cp Resources/AppIcon.icns Resources/MenuBarIcon.png "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

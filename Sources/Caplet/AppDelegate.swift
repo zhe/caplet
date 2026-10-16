@@ -33,9 +33,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        let icon = NSImage(contentsOf: Bundle.module.url(forResource: "MenuBarIcon", withExtension: "png")!)!
-        icon.size = NSSize(width: 18, height: 18)
-        icon.isTemplate = true
+        // MenuBarIcon.png is only in the bundled app; `swift run` falls back to a system symbol.
+        let icon = Bundle.main.image(forResource: "MenuBarIcon")
+            ?? NSImage(systemSymbolName: "rectangle.split.2x1", accessibilityDescription: "Caplet")
+        icon?.size = NSSize(width: 18, height: 18)
+        icon?.isTemplate = true
         statusItem.button?.image = icon
         statusItem.button?.setAccessibilityLabel("Caplet")
         statusItem.menu = buildMenu()
