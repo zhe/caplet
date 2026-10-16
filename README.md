@@ -212,6 +212,7 @@ plain Foundation, so the tests also run on Linux.
 | `Sources/Caplet/CapsLockState.swift` | Flips the system Caps Lock state through IOHIDSystem, the same state the physical key toggles. |
 | `Sources/Caplet/LoginItem.swift` | Launch at login through `SMAppService.mainApp`. |
 | `Sources/Caplet/AppDelegate.swift` | Menu-bar item, menu, and shortcut wiring. |
+| `Resources/` | The app icon (`AppIcon.icns`) and the menu-bar icon (`MenuBarIcon.png`, a 36×36 black-on-transparent template image shown at 18 points). `bundle.sh` copies both into the app. |
 
 Details handled:
 

@@ -14,6 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin),
                                        keyEquivalent: "")
     private var loginItemError: String?
+    /// Plain title and drawn shortcut label of each item that shows one.
+    private var shortcuts: [ObjectIdentifier: (title: String, label: String)] = [:]
     private var terminationSignal: DispatchSourceSignal?
 
     private static let cyclingKey = "cycleSizes"
@@ -68,23 +70,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.delegate = self
         menu.autoenablesItems = false
 
-        let paragraph = shortcutParagraphStyle()
         for action in TileAction.allCases {
             if action == .topLeft || action == .maximize { menu.addItem(.separator()) }
-            let item = NSMenuItem(title: action.title, action: #selector(menuAction(_:)), keyEquivalent: "")
-            item.attributedTitle = titleWithShortcut(action.title, Self.shortcutLabel(for: action), paragraph)
+            let item = shortcutItem(action.title, Self.shortcutLabel(for: action), #selector(menuAction(_:)))
             item.representedObject = action.rawValue
-            item.target = self
             menu.addItem(item)
         }
 
         menu.addItem(.separator())
         menu.addItem(sectionHeader("Arrange"))
         for action in ArrangeAction.menuCases {
-            let item = NSMenuItem(title: action.title, action: #selector(arrangeAction(_:)), keyEquivalent: "")
-            item.attributedTitle = titleWithShortcut(action.title, Self.shortcutLabel(for: action), paragraph)
+            let item = shortcutItem(action.title, Self.shortcutLabel(for: action), #selector(arrangeAction(_:)))
             item.representedObject = action.rawValue
-            item.target = self
             menu.addItem(item)
         }
 
@@ -101,26 +98,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         permissionItem.target = self
         menu.addItem(permissionItem)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Caplet", action: #selector(NSApplication.terminate(_:)),
-                                keyEquivalent: "q"))
+        let quit = shortcutItem("Quit Caplet", "⌘Q", #selector(NSApplication.terminate(_:)))
+        quit.target = NSApp
+        menu.addItem(quit)
+        // AppKit draws real key equivalents in a column right of every title, which the drawn
+        // ⇪ labels can't line up with. This hidden twin keeps ⌘Q working while the menu is open.
+        let quitKey = NSMenuItem(title: "Quit Caplet", action: #selector(NSApplication.terminate(_:)),
+                                 keyEquivalent: "q")
+        quitKey.isHidden = true
+        quitKey.allowsKeyEquivalentWhenHidden = true
+        menu.addItem(quitKey)
+
+        alignShortcuts(in: menu)
         return menu
     }
 
+    private func shortcutItem(_ title: String, _ label: String?, _ action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.target = self
+        if let label { shortcuts[ObjectIdentifier(item)] = (title, label) }
+        return item
+    }
+
     // Key equivalents only accept real modifiers (⌃⌥⇧⌘), so the ⇪ shortcut is drawn into the
-    // title after a right-aligned tab stop, styled like a native shortcut column.
-    private func shortcutParagraphStyle() -> NSParagraphStyle {
+    // title after a right-aligned tab stop. The stop sits at the widest visible item, so the
+    // labels end at the menu's right edge like a native shortcut column.
+    private func alignShortcuts(in menu: NSMenu) {
         let font = NSFont.menuFont(ofSize: 0)
         func width(_ text: String) -> CGFloat {
             (text as NSString).size(withAttributes: [.font: font]).width
         }
-        let titles = TileAction.allCases.map(\.title) + ArrangeAction.menuCases.map(\.title)
-        let labels = TileAction.allCases.compactMap { Self.shortcutLabel(for: $0) }
-            + ArrangeAction.menuCases.compactMap { Self.shortcutLabel(for: $0) }
-        let titleWidth = titles.map(width).max() ?? 0
-        let labelWidth = labels.map(width).max() ?? 0
+        let visible = menu.items.filter { !$0.isHidden && !$0.isSeparatorItem }
+        let labelled = visible.compactMap { item in shortcuts[ObjectIdentifier(item)].map { (item, $0) } }
+        let others = visible.filter { shortcuts[ObjectIdentifier($0)] == nil }
+        let titleWidth = labelled.map { width($0.1.title) }.max() ?? 0
+        let labelWidth = labelled.map { width($0.1.label) }.max() ?? 0
+        let otherWidth = others.map { width($0.title) }.max() ?? 0
+
         let paragraph = NSMutableParagraphStyle()
-        paragraph.tabStops = [NSTextTab(textAlignment: .right, location: ceil(titleWidth + 48 + labelWidth))]
-        return paragraph
+        let stop = ceil(max(titleWidth + 48 + labelWidth, otherWidth))
+        paragraph.tabStops = [NSTextTab(textAlignment: .right, location: stop)]
+
+        for (item, shortcut) in labelled {
+            let title = NSMutableAttributedString(string: shortcut.title + "\t",
+                                                  attributes: [.font: font, .paragraphStyle: paragraph])
+            title.append(NSAttributedString(string: shortcut.label, attributes: [
+                .font: font, .paragraphStyle: paragraph, .foregroundColor: NSColor.secondaryLabelColor,
+            ]))
+            item.attributedTitle = title
+        }
     }
 
     private func sectionHeader(_ title: String) -> NSMenuItem {
@@ -128,18 +154,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         item.isEnabled = false
         return item
-    }
-
-    private func titleWithShortcut(_ text: String, _ label: String?,
-                                   _ paragraph: NSParagraphStyle) -> NSAttributedString? {
-        guard let label else { return nil }
-        let font = NSFont.menuFont(ofSize: 0)
-        let title = NSMutableAttributedString(string: text + "\t",
-                                              attributes: [.font: font, .paragraphStyle: paragraph])
-        title.append(NSAttributedString(string: label, attributes: [
-            .font: font, .paragraphStyle: paragraph, .foregroundColor: NSColor.secondaryLabelColor,
-        ]))
-        return title
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -171,6 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         statusLine.title = notes.joined(separator: " · ")
         statusLine.isHidden = notes.isEmpty
+        alignShortcuts(in: menu)
 
         for item in menu.items {
             if item.representedObject is String { item.isEnabled = trusted }
