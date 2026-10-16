@@ -33,8 +33,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "rectangle.split.2x1",
-                                           accessibilityDescription: "Caplet")
+        let icon = NSImage(contentsOf: Bundle.module.url(forResource: "MenuBarIcon", withExtension: "png")!)!
+        icon.size = NSSize(width: 18, height: 18)
+        icon.isTemplate = true
+        statusItem.button?.image = icon
+        statusItem.button?.setAccessibilityLabel("Caplet")
         statusItem.menu = buildMenu()
 
         WindowMover.requestTrust()
