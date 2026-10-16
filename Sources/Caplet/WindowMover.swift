@@ -57,7 +57,9 @@ enum WindowMover {
 
         let screen = screens[index]
         let last = cycling ? lastCycle.flatMap { CFEqual($0.window, window) ? $0.record : nil } : nil
-        let step = cycling ? Cycle.nextStep(for: action, window: current, screen: screen, last: last) : 0
+        let step = cycling
+            ? Cycle.nextStep(for: action, window: current, screen: screen, last: last)
+            : Cycle.fixedStep(for: action)
 
         let target: CGRect
         switch action {

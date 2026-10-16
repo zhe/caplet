@@ -75,6 +75,32 @@ public enum Layout {
         }
     }
 
+    /// Pushes `window` against the edge (halves) or into the corner (quarters) of `action`
+    /// without resizing it; the other coordinate stays put. Returns nil when the window is
+    /// bigger than that half or quarter, since sliding alone wouldn't put it there.
+    public static func slid(_ window: CGRect, toward action: TileAction, in visible: CGRect) -> CGRect? {
+        switch action {
+        case .leftHalf, .rightHalf, .topHalf, .bottomHalf, .topLeft, .topRight, .bottomLeft, .bottomRight:
+            break
+        case .maximize, .center, .nextDisplay:
+            return nil
+        }
+        guard let region = frame(for: action, in: visible),
+              window.width <= region.width, window.height <= region.height else { return nil }
+        var origin = window.origin
+        switch action {
+        case .leftHalf, .topLeft, .bottomLeft: origin.x = visible.minX
+        case .rightHalf, .topRight, .bottomRight: origin.x = visible.maxX - window.width
+        default: break
+        }
+        switch action {
+        case .topHalf, .topLeft, .topRight: origin.y = visible.minY
+        case .bottomHalf, .bottomLeft, .bottomRight: origin.y = visible.maxY - window.height
+        default: break
+        }
+        return clamp(CGRect(origin: origin, size: window.size), to: visible)
+    }
+
     /// Keeps the window's size (shrunk to fit if needed) and puts it in the middle of `visible`.
     public static func centered(_ window: CGRect, in visible: CGRect) -> CGRect {
         let width = min(window.width, visible.width)

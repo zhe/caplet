@@ -26,16 +26,24 @@ Q  W  E        ↖  ↑  ↗
 
 The same actions, with their shortcuts, are also in the menu-bar icon's menu.
 
-Repeated presses cycle sizes:
+The first press keeps the window's size when it can, and repeated presses cycle sizes:
 
-- **Halves:** ½ → ⅔ → ⅓ → ½ of the screen (width for left/right, height for top/bottom).
-- **Quarters:** the width cycles ½ → ⅔ → ⅓ the same way; the height stays half the screen.
+- **Halves:** if the window fits in that half, the first press only slides it against the
+  edge (⇪A keeps its height position, ⇪W its horizontal position). Then ½ → ⅔ → ⅓ → ½ of
+  the screen (width for left/right, height for top/bottom).
+- **Quarters:** if the window fits in that quarter, the first press only slides it into the
+  corner. Then the width cycles ½ → ⅔ → ⅓ the same way; the height stays half the screen.
 - **Center:** the first press centers the window at its own size. The second resizes it to ⅔
   of the screen's width and height. Further presses keep it at ⅔.
 
+The slide is skipped, and the first press goes straight to ½, when the window is bigger than
+the half or quarter, already against that edge, or within a few points of ½ anyway. Once a
+window has been resized, the cycle never slides it again.
+
 A repeated press advances when the window is still where the last press put it, or already
 sits at one of those sizes. Otherwise it starts again at the first step. Turn this off with
-**Cycle Sizes on Repeated Presses** in the menu.
+**Cycle Sizes on Repeated Presses** in the menu. Then halves and quarters always go to ½
+(no slide), and Center always keeps the window's size.
 
 ### Arrange
 
@@ -194,7 +202,7 @@ plain Foundation, so the tests also run on Linux.
 | File | Role |
 |---|---|
 | `Sources/CapletCore/Layout.swift` | Pure geometry, all in Accessibility coordinates (top-left origin of the primary display, y down). |
-| `Sources/CapletCore/Cycle.swift` | Picks the next size for repeated presses (halves, quarters, and center). It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
+| `Sources/CapletCore/Cycle.swift` | Picks the step for each press: slide or center at the window's own size first, then the next size on repeated presses (halves, quarters, and center). It compares against the frame the app actually accepted, because apps like Terminal round sizes. |
 | `Sources/Caplet/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
 | `Sources/CapletCore/Arrange.swift` | Arrange layouts: which slot each window gets, and which windows behind the focused one may join. |
 | `Sources/Caplet/WindowList.swift` | Lists on-screen windows front to back (`CGWindowListCopyWindowInfo`) and matches them to Accessibility windows by window ID. |
