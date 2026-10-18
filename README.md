@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/icon.png" alt="Caplet icon" width="128" height="128">
+</p>
+
 # Caplet
 
 A tiny macOS menu-bar window manager. It moves the focused window of whatever app is in front.
