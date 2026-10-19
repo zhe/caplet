@@ -70,6 +70,14 @@ public struct KeyMapping: Equatable, Sendable {
     }
 }
 
+public enum RemapCheck: Equatable, Sendable {
+    case intact
+    /// A keyboard has no Caps Lock remap, e.g. one plugged in after Caplet set it.
+    case missing
+    /// A keyboard sends another key for Caps Lock: another app remapped it after Caplet.
+    case taken(by: UInt64)
+}
+
 /// Builds `hidutil property` arguments that remap Caps Lock to F18 while leaving the
 /// user's other key remaps intact.
 public enum HyperRemap {
@@ -79,15 +87,56 @@ public enum HyperRemap {
 
     /// Parses `hidutil property --get UserKeyMapping`, which prints an old-style plist
     /// such as `( { HIDKeyboardModifierMappingDst = 30064771181; HIDKeyboardModifierMappingSrc = 30064771129; } )`
-    /// or `(null)`.
+    /// or `(null)`, once per HID service on recent macOS. Each remap is listed once.
     public static func parse(_ output: String) -> [KeyMapping] {
         guard let block = try? NSRegularExpression(pattern: "\\{([^}]*)\\}") else { return [] }
         let range = NSRange(output.startIndex..., in: output)
-        return block.matches(in: output, range: range).compactMap { match in
+        var mappings: [KeyMapping] = []
+        for match in block.matches(in: output, range: range) {
             guard let body = Range(match.range(at: 1), in: output).map({ String(output[$0]) }),
                   let src = number(named: "HIDKeyboardModifierMappingSrc", in: body),
-                  let dst = number(named: "HIDKeyboardModifierMappingDst", in: body) else { return nil }
-            return KeyMapping(src: src, dst: dst)
+                  let dst = number(named: "HIDKeyboardModifierMappingDst", in: body) else { continue }
+            let mapping = KeyMapping(src: src, dst: dst)
+            if !mappings.contains(mapping) { mappings.append(mapping) }
+        }
+        return mappings
+    }
+
+    /// The remaps of each HID service. Recent macOS starts each service's row with its
+    /// registry ID (`100000aab   UserKeyMapping   ( ... )`); older versions print one plist.
+    public static func parseServices(_ output: String) -> [[KeyMapping]] {
+        var rows: [String] = []
+        for line in output.split(separator: "\n", omittingEmptySubsequences: false) {
+            let fields = line.split(separator: " ", maxSplits: 2)
+            if fields.count >= 2, fields[1] == "UserKeyMapping", UInt64(fields[0], radix: 16) != nil {
+                rows.append(String(line))
+            } else if !rows.isEmpty {
+                rows[rows.count - 1] += "\n" + line
+            }
+        }
+        return rows.isEmpty ? [parse(output)] : rows.map(parse)
+    }
+
+    /// Whether every keyboard still sends F18 for Caps Lock.
+    public static func check(keyboards: [[KeyMapping]]) -> RemapCheck {
+        let targets = keyboards.map { mappings in mappings.first { $0.src == capsLock }?.dst }
+        if let other = targets.compactMap({ $0 }).first(where: { $0 != f18 }) { return .taken(by: other) }
+        return targets.contains(nil) ? .missing : .intact
+    }
+
+    /// A readable name for a remap target, such as "F20", or nil for keys without a short name.
+    public static func keyName(_ usage: UInt64) -> String? {
+        guard usage >> 32 == 7 else { return nil }
+        switch usage & 0xFFFF_FFFF {
+        case let key where (0x3A...0x45).contains(key): return "F\(key - 0x3A + 1)"
+        case let key where (0x68...0x73).contains(key): return "F\(key - 0x68 + 13)"
+        case 0x29: return "Escape"
+        case 0x39: return "Caps Lock"
+        case 0xE0, 0xE4: return "Control"
+        case 0xE1, 0xE5: return "Shift"
+        case 0xE2, 0xE6: return "Option"
+        case 0xE3, 0xE7: return "Command"
+        default: return nil
         }
     }
 

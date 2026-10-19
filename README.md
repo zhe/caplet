@@ -94,6 +94,13 @@ relaunch it, log out, or run:
 hidutil property --set '{"UserKeyMapping":[]}'   # also clears any other hidutil remaps
 ```
 
+Caplet checks the remap again after the Mac wakes, when a keyboard is connected, and when
+you open its menu, and puts it back on any keyboard that lost it. Only one app can remap
+Caps Lock at a time, though. If another one has done so since (Raycast's Hyper Key does
+this on every wake, for example), Caplet leaves it alone. The menu then says the ⇪ shortcuts
+are off, the menu-bar icon dims, and **Take Back Caps Lock** remaps it to F18 again. To stop
+the two apps fighting over the key, turn off the other app's Caps Lock feature.
+
 Requires macOS 13+ and Xcode 15+ (or the matching Command Line Tools).
 
 If `swift build` fails with `Invalid manifest` and `Undefined symbols ... PackageDescription`,

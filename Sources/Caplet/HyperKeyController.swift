@@ -1,5 +1,6 @@
 import AppKit
 import CapletCore
+import IOKit
 
 /// Caps Lock as a hyper key: hidutil remaps Caps Lock to F18, and a keyboard event tap
 /// treats F18 as held-down modifier, swallowing the bound keys pressed while it is down.
@@ -11,10 +12,15 @@ final class HyperKeyController {
         case off
         case waitingForAccessibility
         case active
+        /// Another app remapped Caps Lock after Caplet did. Holds the key it sends now, if known.
+        case takenOver(String?)
         case failed(String)
     }
 
-    private(set) var state: State = .off
+    private(set) var state: State = .off {
+        didSet { if state != oldValue { onStateChange?() } }
+    }
+    var onStateChange: (@MainActor () -> Void)?
     private let onCommand: @MainActor (HyperCommand) -> Void
 
     private var tap: CFMachPort?
@@ -22,6 +28,10 @@ final class HyperKeyController {
     private var retryTimer: Timer?
     private var capsTap = CapsTap()
     private var displacedMapping: KeyMapping?
+    private var wakeObserver: NSObjectProtocol?
+    private var keyboardPort: IONotificationPortRef?
+    private var keyboardIterator: io_iterator_t = 0
+    private var checkTimer: Timer?
 
     init(onCommand: @escaping @MainActor (HyperCommand) -> Void) {
         self.onCommand = onCommand
@@ -47,6 +57,43 @@ final class HyperKeyController {
         }
         displacedMapping = change.displaced
         state = .active
+        watchKeyboards()
+    }
+
+    /// Puts Caps Lock → F18 back on keyboards that lost it, such as one plugged in later, but
+    /// leaves another app's Caps Lock remap alone: overwriting it would start a tug-of-war
+    /// that each wake decides. `takeBack()` does that when the user asks.
+    func recheck() {
+        switch state {
+        case .active, .takenOver: break
+        case .off, .waitingForAccessibility, .failed: return
+        }
+        guard let keyboards = HIDUtil.keyboardMappings() else { return }
+        switch HyperRemap.check(keyboards: keyboards) {
+        case .intact:
+            state = .active
+        case .missing:
+            state = reapply() ? .active : .failed("Couldn't remap Caps Lock with hidutil")
+        case .taken(let key):
+            state = .takenOver(HyperRemap.keyName(key))
+        }
+    }
+
+    func takeBack() {
+        guard case .takenOver = state else { return }
+        if reapply() { recheck() }
+    }
+
+    private var capsLockTakenOver: Bool {
+        guard let keyboards = HIDUtil.keyboardMappings(),
+              case .taken = HyperRemap.check(keyboards: keyboards) else { return false }
+        return true
+    }
+
+    /// Keeps `displacedMapping`: a remap taken back belongs to another app, not to the user.
+    private func reapply() -> Bool {
+        guard let current = HIDUtil.currentMappings() else { return false }
+        return HIDUtil.set(HyperRemap.enabling(current).mappings)
     }
 
     /// Removes the tap and gives Caps Lock back. Must run before quitting, otherwise
@@ -59,11 +106,60 @@ final class HyperKeyController {
             return
         }
         removeTap()
+        stopWatchingKeyboards()
         if let current = HIDUtil.currentMappings() {
-            HIDUtil.set(HyperRemap.disabling(current, restoring: displacedMapping))
+            // An app that took Caps Lock since owns it now: keep its remap, not the one Caplet displaced.
+            HIDUtil.set(HyperRemap.disabling(current, restoring: capsLockTakenOver ? nil : displacedMapping))
         }
         displacedMapping = nil
         state = .off
+    }
+
+    /// The built-in keyboard can come back after sleep without the remap, and other apps
+    /// with a hyper key reapply theirs on wake, so check after waking and whenever a
+    /// keyboard appears. The delay lets those apps finish first.
+    private func watchKeyboards() {
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.scheduleCheck() }
+        }
+
+        guard let matching = IOServiceMatching("IOHIDEventService"),
+              let port = IONotificationPortCreate(kIOMainPortDefault) else { return }
+        CFRunLoopAddSource(CFRunLoopGetMain(), IONotificationPortGetRunLoopSource(port).takeUnretainedValue(),
+                           .commonModes)
+        (matching as NSMutableDictionary)["IOPropertyMatch"] = ["PrimaryUsagePage": 1, "PrimaryUsage": 6]
+        guard IOServiceAddMatchingNotification(port, kIOFirstMatchNotification, matching, keyboardAppeared,
+                                               Unmanaged.passUnretained(self).toOpaque(),
+                                               &keyboardIterator) == KERN_SUCCESS else {
+            IONotificationPortDestroy(port)
+            return
+        }
+        keyboardPort = port
+        // Draining arms the notification. The keyboards already there got the remap in start().
+        drain(keyboardIterator)
+    }
+
+    private func stopWatchingKeyboards() {
+        if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
+        wakeObserver = nil
+        if keyboardIterator != 0 { IOObjectRelease(keyboardIterator) }
+        keyboardIterator = 0
+        if let keyboardPort { IONotificationPortDestroy(keyboardPort) }
+        keyboardPort = nil
+        checkTimer?.invalidate()
+        checkTimer = nil
+    }
+
+    fileprivate func scheduleCheck() {
+        checkTimer?.invalidate()
+        checkTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.checkTimer = nil
+                self?.recheck()
+            }
+        }
     }
 
     private func scheduleRetry() {
@@ -143,6 +239,22 @@ final class HyperKeyController {
     }
 }
 
+private func drain(_ iterator: io_iterator_t) {
+    var service = IOIteratorNext(iterator)
+    while service != IO_OBJECT_NULL {
+        IOObjectRelease(service)
+        service = IOIteratorNext(iterator)
+    }
+}
+
+private func keyboardAppeared(refcon: UnsafeMutableRawPointer?, iterator: io_iterator_t) {
+    drain(iterator)
+    guard let refcon else { return }
+    let controller = Unmanaged<HyperKeyController>.fromOpaque(refcon).takeUnretainedValue()
+    // The notification port's run loop source is on the main run loop.
+    MainActor.assumeIsolated { controller.scheduleCheck() }
+}
+
 private func hyperTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent,
                               userInfo: UnsafeMutableRawPointer?) -> Unmanaged<CGEvent>? {
     guard let userInfo else { return Unmanaged.passUnretained(event) }
@@ -155,6 +267,12 @@ private func hyperTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: 
 enum HIDUtil {
     static func currentMappings() -> [KeyMapping]? {
         run(["property", "--get", "UserKeyMapping"]).map(HyperRemap.parse)
+    }
+
+    /// The remaps of each keyboard, leaving out trackpads, sensors and other HID services.
+    static func keyboardMappings() -> [[KeyMapping]]? {
+        run(["property", "--matching", "{\"PrimaryUsagePage\":1,\"PrimaryUsage\":6}",
+             "--get", "UserKeyMapping"]).map(HyperRemap.parseServices)
     }
 
     @discardableResult

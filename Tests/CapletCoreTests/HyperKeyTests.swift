@@ -56,6 +56,55 @@ final class HyperKeyTests: XCTestCase {
         ])
     }
 
+    // Recent macOS prints one row per HID service. The keyboard here has Raycast's Caps Lock → F20.
+    private let perServiceOutput = """
+    RegistryID  Key                   Value
+    100000aa8   UserKeyMapping   (
+            {
+            HIDKeyboardModifierMappingDst = 30064771181;
+            HIDKeyboardModifierMappingSrc = 30064771129;
+        }
+    )
+    1000006a8   UserKeyMapping   (null)
+    100000aab   UserKeyMapping   (
+            {
+            HIDKeyboardModifierMappingDst = 30064771183;
+            HIDKeyboardModifierMappingSrc = 30064771129;
+        },
+            {
+            HIDKeyboardModifierMappingDst = 30064771181;
+            HIDKeyboardModifierMappingSrc = 30064771129;
+        }
+    )
+    """
+
+    func testParsesEachServiceAndListsEachRemapOnce() {
+        let f20 = KeyMapping(src: HyperRemap.capsLock, dst: 0x7_0000_006F)
+        XCTAssertEqual(HyperRemap.parseServices(perServiceOutput), [[HyperRemap.hyper], [], [f20, HyperRemap.hyper]])
+        XCTAssertEqual(HyperRemap.parse(perServiceOutput), [HyperRemap.hyper, f20])
+        XCTAssertEqual(HyperRemap.parseServices("(null)\n"), [[]])
+    }
+
+    func testCheckFindsMissingAndTakenCapsLock() {
+        let f20: UInt64 = 0x7_0000_006F
+        let swapCmdOpt = KeyMapping(src: 0x7_0000_00E3, dst: 0x7_0000_00E2)
+        XCTAssertEqual(HyperRemap.check(keyboards: [[swapCmdOpt, HyperRemap.hyper], [HyperRemap.hyper]]), .intact)
+        XCTAssertEqual(HyperRemap.check(keyboards: [[HyperRemap.hyper], [swapCmdOpt]]), .missing)
+        // Another app's remap wins over a missing one: re-adding F18 there would overwrite it.
+        XCTAssertEqual(HyperRemap.check(keyboards: [[], [KeyMapping(src: HyperRemap.capsLock, dst: f20)]]),
+                       .taken(by: f20))
+        XCTAssertEqual(HyperRemap.check(keyboards: []), .intact)
+    }
+
+    func testKeyNames() {
+        XCTAssertEqual(HyperRemap.keyName(0x7_0000_006F), "F20")
+        XCTAssertEqual(HyperRemap.keyName(HyperRemap.f18), "F18")
+        XCTAssertEqual(HyperRemap.keyName(0x7_0000_003A), "F1")
+        XCTAssertEqual(HyperRemap.keyName(0x7_0000_0029), "Escape")
+        XCTAssertNil(HyperRemap.keyName(0x7_0000_0004)) // A
+        XCTAssertNil(HyperRemap.keyName(0xFF_0000_0003))
+    }
+
     func testParsesNull() {
         XCTAssertEqual(HyperRemap.parse("(null)\n"), [])
     }

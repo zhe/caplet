@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let permissionItem = NSMenuItem(title: "Grant Accessibility Access…",
                                             action: #selector(openAccessibilitySettings), keyEquivalent: "")
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    private let takeBackItem = NSMenuItem(title: "Take Back Caps Lock", action: #selector(takeBackCapsLock),
+                                          keyEquivalent: "")
     private let cycleItem = NSMenuItem(title: "Cycle Sizes on Repeated Presses",
                                        action: #selector(toggleCycling), keyEquivalent: "")
     private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin),
@@ -45,7 +47,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = buildMenu()
 
         WindowMover.requestTrust()
+        hyperKey.onStateChange = { [weak self] in self?.updateIcon() }
         hyperKey.start()
+        updateIcon()
         quitOnSIGTERM()
     }
 
@@ -59,6 +63,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         source.resume()
         terminationSignal = source
+    }
+
+    /// Dims the menu-bar icon while the ⇪ shortcuts are off.
+    private func updateIcon() {
+        statusItem.button?.appearsDisabled = hyperKey.state != .active
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -95,6 +104,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusLine.isEnabled = false
         statusLine.isHidden = true
         menu.addItem(statusLine)
+        takeBackItem.target = self
+        menu.addItem(takeBackItem)
         permissionItem.target = self
         menu.addItem(permissionItem)
         menu.addItem(.separator())
@@ -157,6 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        // Opening the menu is the natural next step when shortcuts stop working.
+        hyperKey.recheck()
         let trusted = WindowMover.isTrusted
         permissionItem.isHidden = trusted
         cycleItem.state = cyclingEnabled ? .on : .off
@@ -167,8 +180,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         switch hyperKey.state {
         case .waitingForAccessibility: notes.append("⇪ shortcuts start once Accessibility access is on")
         case .failed(let reason): notes.append("⇪ shortcuts are off: \(reason). Relaunch Caplet to retry")
+        case .takenOver(let key):
+            notes.append("⇪ shortcuts are off: another app remapped Caps Lock" + (key.map { " to \($0)" } ?? ""))
         case .off, .active: break
         }
+        if case .takenOver = hyperKey.state { takeBackItem.isHidden = false } else { takeBackItem.isHidden = true }
 
         let login = LoginItem.state
         loginItem.isEnabled = login != .unavailable
@@ -214,6 +230,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             NSSound.beep()
             NSLog("Caplet: %@ failed: %@", String(describing: command), String(describing: error))
         }
+    }
+
+    @objc private func takeBackCapsLock() {
+        hyperKey.takeBack()
     }
 
     @objc private func toggleCycling() {
