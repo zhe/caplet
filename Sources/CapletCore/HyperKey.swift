@@ -23,7 +23,7 @@ public enum HyperBindings {
     public static let keyLabels: [TileAction: String] = [
         .topHalf: "W", .leftHalf: "A", .bottomHalf: "S", .rightHalf: "D",
         .topLeft: "Q", .topRight: "E", .bottomLeft: "Z", .bottomRight: "X",
-        .maximize: "F", .center: "C", .nextDisplay: "Space",
+        .maximize: "F", .center: "C", .nextDisplay: "␣",
     ]
 
     /// With ⌥ also held, the same keys arrange the windows behind the focused one too.
@@ -42,7 +42,7 @@ public enum HyperBindings {
         actions[keyCode]
     }
 
-    /// ⌥ with a key that has no arrange binding (⇪⌥F) falls back to the plain action.
+    /// ⌥ with a key that has no arrange binding (⌥⇪F) falls back to the plain action.
     public static func command(forKeyCode keyCode: Int, option: Bool) -> HyperCommand? {
         if option, let arrange = arrangeActions[keyCode] { return .arrange(arrange) }
         return actions[keyCode].map(HyperCommand.tile)
