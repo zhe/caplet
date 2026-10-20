@@ -1,23 +1,38 @@
 #!/usr/bin/env bash
 # Builds Caplet.app in ./build. Running it as an .app (instead of `swift run`) makes
 # macOS attach the Accessibility permission to Caplet rather than to your terminal.
+#
+# --release VERSION builds a universal (Apple silicon + Intel) app stamped with VERSION and
+# packs it as build/Caplet-VERSION.zip, ready to attach to a GitHub release.
 set -euo pipefail
+
+usage() { echo "usage: $0 [--install] [--zip] [--release VERSION]" >&2; exit 64; }
 
 INSTALL=0
 ZIP=0
-for arg in "$@"; do
-    case "$arg" in
+ZIPFILE="build/Caplet.zip"
+VERSION="0.0.0"   # local builds; releases pass their own
+ARCHS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
         --install) INSTALL=1 ;;
         --zip) ZIP=1 ;;
-        *) echo "usage: $0 [--install] [--zip]" >&2; exit 64 ;;
+        --release)
+            [[ $# -ge 2 && "$2" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+                || { echo "--release needs a version like 1.2.3" >&2; usage; }
+            VERSION="$2"; ZIP=1; ZIPFILE="build/Caplet-$2.zip"
+            ARCHS=(--arch arm64 --arch x86_64)
+            shift ;;
+        *) usage ;;
     esac
+    shift
 done
 
 cd "$(dirname "$0")/.."
 APP="build/Caplet.app"
 
-swift build -c release
-BIN="$(swift build -c release --show-bin-path)/Caplet"
+swift build -c release ${ARCHS[@]+"${ARCHS[@]}"}
+BIN="$(swift build -c release ${ARCHS[@]+"${ARCHS[@]}"} --show-bin-path)/Caplet"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -26,7 +41,7 @@ cp "$BIN" "$APP/Contents/MacOS/Caplet"
 # (Bundle.module) would look in the .app's root, which codesign doesn't allow.
 cp Resources/AppIcon.icns Resources/MenuBarIcon.png "$APP/Contents/Resources/"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -42,9 +57,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>AppIcon.icns</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>$VERSION</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
@@ -64,6 +79,10 @@ fi
 if [[ -n "$IDENTITY" ]]; then
     codesign --force --sign "$IDENTITY" "$APP"
     echo "Built $APP (signed with \"$IDENTITY\")"
+elif [[ ${#ARCHS[@]} -gt 0 ]]; then
+    # Users would have to re-grant Accessibility after every update of an ad-hoc release.
+    echo "--release needs a signing certificate; see \"Signing\" in README.md" >&2
+    exit 1
 else
     codesign --force --sign - "$APP"
     echo "Built $APP (ad-hoc signed: re-add it under Accessibility after each rebuild;"
@@ -79,9 +98,9 @@ fi
 
 if [[ "$ZIP" == 1 ]]; then
     # ditto keeps the code signature intact; Finder's Compress does too, plain `zip` may not.
-    rm -f build/Caplet.zip
-    ditto -c -k --keepParent "$APP" build/Caplet.zip
-    echo "Packed build/Caplet.zip (copy it to another Mac; see \"Other Macs\" in README.md)"
+    rm -f "$ZIPFILE"
+    ditto -c -k --keepParent "$APP" "$ZIPFILE"
+    echo "Packed $ZIPFILE (copy it to another Mac; see \"Other Macs\" in README.md)"
 fi
 
 if [[ "$INSTALL" == 1 ]]; then
