@@ -23,10 +23,12 @@ swift test
 ./scripts/bundle.sh --release "$VERSION"
 
 # Commits made straight on main; work merged from pull requests is listed by --generate-notes.
+# Words like @main become code, so GitHub doesn't mention (and notify) a user by that name.
 PREVIOUS="$(git describe --tags --abbrev=0 2>/dev/null || true)"
 NOTES="## Changes
 
-$(git log --first-parent --no-merges --format='- %s (%h)' ${PREVIOUS:+"$PREVIOUS..HEAD"})
+$(git log --first-parent --no-merges --format='- %s (%h)' ${PREVIOUS:+"$PREVIOUS..HEAD"} \
+    | sed -E 's/(^|[^`[:alnum:]])@([[:alnum:]_-]+)/\1`@\2`/g')
 "
 
 URL="$(gh release create "$TAG" "build/Caplet-$VERSION.zip" --draft \
