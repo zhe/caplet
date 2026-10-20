@@ -56,11 +56,11 @@ like Window › Move & Resize › Arrange in macOS Sequoia:
 
 | Arrange | Shortcut | Focused window goes |
 |---|---|---|
-| Left & Right | ⇪⌥A | left; the next window goes right |
-| Right & Left | ⇪⌥D | right; the next window goes left |
-| Top & Bottom | ⇪⌥W | top; the next window goes bottom |
-| Bottom & Top | ⇪⌥S | bottom; the next window goes top |
-| Quarters | ⇪⌥Q / ⇪⌥E / ⇪⌥Z / ⇪⌥X | into that corner; the next three windows fill the other corners in reading order |
+| Left & Right | ⌥⇪A | left; the next window goes right |
+| Right & Left | ⌥⇪D | right; the next window goes left |
+| Top & Bottom | ⌥⇪W | top; the next window goes bottom |
+| Bottom & Top | ⌥⇪S | bottom; the next window goes top |
+| Quarters | ⌥⇪Q / ⌥⇪E / ⌥⇪Z / ⌥⇪X | into that corner; the next three windows fill the other corners in reading order |
 
 - "Behind" means the stacking order, so the windows you used most recently join first.
   They can come from any app.
