@@ -73,6 +73,26 @@ like Window › Move & Resize › Arrange in macOS Sequoia:
 
 The menu lists the Arrange layouts too. Its **Quarters** item puts the focused window top-left.
 
+### App shortcuts
+
+Bind any free letter or digit to an app, so ⇪ and that key opens it:
+
+```bash
+defaults write net.zhezhang.Caplet launchers -dict B com.apple.Safari T com.apple.Terminal
+defaults write net.zhezhang.Caplet launchers -dict-add G com.google.Chrome   # add one more
+defaults delete net.zhezhang.Caplet launchers                                  # remove them all
+```
+
+Caplet picks up changes right away. Find an app's bundle ID with
+`osascript -e 'id of app "Safari"'`.
+
+- If the app isn't running, the shortcut opens it. If it's running, the shortcut brings it to
+  the front and unhides it. If it's already in front, the shortcut hides it.
+- Hold ⇪ and tap several app keys to open several apps in one go.
+- Keys are matched by physical position, like the window keys, and named by their place on a
+  US keyboard. The window keys (Q W E A S D Z X F C) can't be used.
+- The menu lists app shortcuts under **Apps**, and notes any entry it can't use.
+
 ### About Caps Lock
 
 Caps Lock still works as Caps Lock:
@@ -230,7 +250,8 @@ swift test
 ```
 
 The tests cover `CapletCore`: coordinate flipping, halves, size cycling, picking a screen,
-moving between displays, picking and placing windows for Arrange, ⇪ key bindings, and the
+moving between displays, picking and placing windows for Arrange, ⇪ key bindings, app
+shortcut settings, and the
 `hidutil` remap handling. That module is
 plain Foundation, so the tests also run on Linux.
 
@@ -245,6 +266,8 @@ plain Foundation, so the tests also run on Linux.
 | `Sources/Caplet/WindowList.swift` | Lists on-screen windows front to back (`CGWindowListCopyWindowInfo`) and matches them to Accessibility windows by window ID. |
 | `Sources/CapletCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
 | `Sources/Caplet/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
+| `Sources/CapletCore/Launcher.swift` | Reads the app shortcuts from settings: key names to key codes, and which entries can't be used. |
+| `Sources/Caplet/AppLauncher.swift` | Opens, brings forward, or hides the app for an app shortcut (`NSWorkspace`). |
 | `Sources/CapletCore/CapsTap.swift` | Tells a tap of Caps Lock (toggle capitals) apart from holding it for a shortcut. |
 | `Sources/Caplet/CapsLockState.swift` | Flips the system Caps Lock state through IOHIDSystem, the same state the physical key toggles. |
 | `Sources/Caplet/LoginItem.swift` | Launch at login through `SMAppService.mainApp`. |

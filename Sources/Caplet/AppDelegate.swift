@@ -16,6 +16,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin),
                                        keyEquivalent: "")
     private var loginItemError: String?
+    private let launchSeparator = NSMenuItem.separator()
+    private lazy var launchHeader = sectionHeader("Apps")
+    private var launchers: [Launcher] = []
+    private var launcherItems: [NSMenuItem] = []
+    private var launcherNotes: [String] = []
     /// Plain title and drawn shortcut label of each item that shows one, and whether Caplet gave
     /// it an icon. `NSMenuItem.image` can't tell: macOS 26 returns a default image for Quit
     /// (`terminate:`) that the status menu doesn't draw.
@@ -84,6 +89,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.button?.image = icon
         statusItem.button?.setAccessibilityLabel("Caplet")
         statusItem.menu = buildMenu()
+        reloadLaunchers()
+        // Unlike didChangeNotification, KVO also reports `defaults write` from other processes.
+        UserDefaults.standard.addObserver(self, forKeyPath: Launchers.defaultsKey, context: nil)
 
         WindowMover.requestTrust()
         hyperKey.onStateChange = { [weak self] in self?.updateIcon() }
@@ -135,6 +143,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item)
         }
 
+        // reloadLaunchers() fills in the apps below the header.
+        menu.addItem(launchSeparator)
+        menu.addItem(launchHeader)
+
         menu.addItem(.separator())
         cycleItem.target = self
         menu.addItem(cycleItem)
@@ -163,6 +175,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         alignShortcuts(in: menu)
         return menu
+    }
+
+    nonisolated override func observeValue(forKeyPath keyPath: String?, of object: Any?,
+                                           change: [NSKeyValueChangeKey: Any]?,
+                                           context: UnsafeMutableRawPointer?) {
+        Task { @MainActor in self.reloadLaunchers() }
+    }
+
+    /// Reads the ⇪ app shortcuts from UserDefaults, hands them to the key tap, and lists them
+    /// in the menu under Apps.
+    private func reloadLaunchers() {
+        let stored = UserDefaults.standard.object(forKey: Launchers.defaultsKey)
+        let config = stored as? [String: Any] ?? [:]
+        let (parsed, problems) = Launchers.parse(config)
+        launchers = parsed
+        launcherNotes = problems.map(\.description)
+        if stored != nil, !(stored is [String: Any]) {
+            launcherNotes.append("App shortcuts need “\(Launchers.defaultsKey)” to be a dictionary")
+        }
+        hyperKey.launchers = Dictionary(uniqueKeysWithValues: parsed.map { ($0.keyCode, $0.bundleID) })
+
+        guard let menu = statusItem.menu else { return }
+        for item in launcherItems {
+            menu.removeItem(item)
+            shortcuts[ObjectIdentifier(item)] = nil
+        }
+        launcherItems = parsed.enumerated().map { index, launcher in
+            let url = AppLauncher.url(for: launcher.bundleID)
+            if url == nil { launcherNotes.append("⇪\(launcher.key): no app with bundle ID \(launcher.bundleID)") }
+            let name = url.map { FileManager.default.displayName(atPath: $0.path) }
+                .map { $0.hasSuffix(".app") ? String($0.dropLast(4)) : $0 } ?? launcher.bundleID
+            let icon = url.map { NSWorkspace.shared.icon(forFile: $0.path) }
+            icon?.size = NSSize(width: 16, height: 16)
+            let item = shortcutItem(name, "⇪\(launcher.key)", #selector(launchAction(_:)), image: icon)
+            item.tag = index
+            return item
+        }
+        let start = menu.index(of: launchHeader) + 1
+        for (offset, item) in launcherItems.enumerated() { menu.insertItem(item, at: start + offset) }
+        launchSeparator.isHidden = parsed.isEmpty
+        launchHeader.isHidden = parsed.isEmpty
     }
 
     private func shortcutItem(_ title: String, _ label: String?, _ action: Selector,
@@ -223,6 +276,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         // Opening the menu is the natural next step when shortcuts stop working.
         hyperKey.recheck()
+        // Also picks up apps installed or moved since the shortcuts were read.
+        reloadLaunchers()
         let trusted = WindowMover.isTrusted
         permissionItem.isHidden = trusted
         cycleItem.state = cyclingEnabled ? .on : .off
@@ -251,6 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if login == .unavailable { notes.append("Launch at login needs Caplet.app, not swift run") }
         if let loginItemError { notes.append(loginItemError) }
+        notes += launcherNotes
 
         statusLine.title = notes.joined(separator: " · ")
         statusLine.isHidden = notes.isEmpty
@@ -271,11 +327,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         run(.arrange(action))
     }
 
+    @objc private func launchAction(_ sender: NSMenuItem) {
+        guard launchers.indices.contains(sender.tag) else { return }
+        run(.launch(launchers[sender.tag].bundleID))
+    }
+
     private func run(_ command: HyperCommand) {
         do {
             switch command {
             case .tile(let action): try WindowMover.perform(action, cycling: cyclingEnabled)
             case .arrange(let action): try WindowMover.arrange(action)
+            case .launch(let bundleID): try AppLauncher.toggle(bundleID)
             }
         } catch TileError.notTrusted {
             WindowMover.requestTrust()

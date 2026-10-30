@@ -21,6 +21,8 @@ final class HyperKeyController {
         didSet { if state != oldValue { onStateChange?() } }
     }
     var onStateChange: (@MainActor () -> Void)?
+    /// Key code → bundle ID of the app that ⇪ and the key opens.
+    var launchers: [Int: String] = [:]
     private let onCommand: @MainActor (HyperCommand) -> Void
 
     private var tap: CFMachPort?
@@ -226,7 +228,8 @@ final class HyperKeyController {
             guard capsTap.isHeld else { return false }
             if type == .keyDown { capsTap.otherKeyPressed() }
             let option = event.flags.contains(.maskAlternate)
-            guard let command = HyperBindings.command(forKeyCode: keyCode, option: option) else { return false }
+            guard let command = HyperBindings.command(forKeyCode: keyCode, option: option,
+                                                      launchers: launchers) else { return false }
             let isRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
             if type == .keyDown, !isRepeat {
                 // Run after returning: a slow Accessibility call inside the tap would get it disabled.

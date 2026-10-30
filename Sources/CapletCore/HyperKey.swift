@@ -43,9 +43,12 @@ public enum HyperBindings {
     }
 
     /// ⌥ with a key that has no arrange binding (⌥⇪F) falls back to the plain action.
-    public static func command(forKeyCode keyCode: Int, option: Bool) -> HyperCommand? {
+    /// `launchers` maps the remaining keys to the bundle ID of the app each one opens.
+    public static func command(forKeyCode keyCode: Int, option: Bool,
+                               launchers: [Int: String] = [:]) -> HyperCommand? {
         if option, let arrange = arrangeActions[keyCode] { return .arrange(arrange) }
-        return actions[keyCode].map(HyperCommand.tile)
+        if let action = actions[keyCode] { return .tile(action) }
+        return launchers[keyCode].map(HyperCommand.launch)
     }
 
     /// The key for an arrange action, e.g. "A" for Left & Right.
@@ -57,6 +60,8 @@ public enum HyperBindings {
 public enum HyperCommand: Equatable, Sendable {
     case tile(TileAction)
     case arrange(ArrangeAction)
+    /// Opens the app with this bundle ID, or hides it when it's already in front.
+    case launch(String)
 }
 
 /// One entry of hidutil's `UserKeyMapping` (HID usage page << 32 | usage).
