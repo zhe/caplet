@@ -93,9 +93,16 @@ does. Keys with a shortcut are filled and show its icon; free keys are outlines.
   on a US keyboard.
 
 App shortcuts open the app if it isn't running, bring it to the front and unhide it if it
-is, and hide it if it's already in front. Hold ⇪ and tap several app keys to open several
-apps in one go. The menu lists them under **Apps**, and notes any app that's no
-longer installed.
+is, and hide it if it's already in front. When the app in front has several windows on
+the display of its focused window, the press tiles them first: two side by side, three as
+the left half and a stack on the right, four in quarters, up to six in a grid. The
+focused window goes top left, and windows past the sixth stay where they are. The next
+press then hides the app, and its windows are still tiled when it comes back, so presses
+go back to showing and hiding until a window is moved, opened or closed. Tiling needs
+Accessibility access; without it, app shortcuts only show and hide.
+
+Hold ⇪ and tap several app keys to open several apps in one go. The menu lists them under
+**Apps**, and notes any app that's no longer installed.
 
 Shortcuts are saved in the `keymap` default (`defaults read net.zhezhang.Caplet keymap`).
 App shortcuts made with the older `launchers` default move into it, in both layers, the
@@ -276,7 +283,7 @@ plain Foundation, so the tests also run on Linux.
 | `Sources/CapletCore/Keyboard.swift` | The keyboard drawn in Settings (ANSI and ISO), and the keys' names and reading order. |
 | `Sources/CapletCore/HyperKey.swift` | Reading, merging, and writing `hidutil` key remaps. |
 | `Sources/Caplet/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
-| `Sources/Caplet/AppLauncher.swift` | Opens, brings forward, or hides the app for an app shortcut (`NSWorkspace`). |
+| `Sources/Caplet/AppLauncher.swift` | Opens, brings forward, tiles the windows of, or hides the app for an app shortcut (`NSWorkspace`). |
 | `Sources/CapletCore/CapsTap.swift` | Tells a tap of Caps Lock (toggle capitals) apart from holding it for a shortcut. |
 | `Sources/Caplet/CapsLockState.swift` | Flips the system Caps Lock state through IOHIDSystem, the same state the physical key toggles. |
 | `Sources/Caplet/LoginItem.swift` | Launch at login through `SMAppService.mainApp`. |

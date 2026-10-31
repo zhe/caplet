@@ -89,4 +89,51 @@ public enum Arrange {
     public static func frames(for action: ArrangeAction, windowCount: Int, in screen: CGRect) -> [CGRect] {
         action.slots.prefix(max(windowCount, 0)).compactMap { Layout.frame(for: $0, in: screen) }
     }
+
+    /// The most windows an app shortcut tiles. Windows further back stay where they are.
+    public static let maximumAppWindows = 6
+
+    /// The layout an app shortcut gives the app's windows, focused window first: halves for 2,
+    /// the left half and a stack on the right for 3, then rows of up to ⌈√n⌉ windows
+    /// (quarters for 4), with a shorter last row widening to fill the screen.
+    public static func appFrames(windowCount: Int, in screen: CGRect) -> [CGRect] {
+        let count = min(max(windowCount, 0), maximumAppWindows)
+        guard count != 3 else {
+            let columns = split(screen, into: 2, horizontally: true)
+            return [columns[0]] + split(columns[1], into: 2, horizontally: false)
+        }
+        guard count > 0 else { return [] }
+        let perRow = Int(Double(count).squareRoot().rounded(.up))
+        let rows = split(screen, into: (count + perRow - 1) / perRow, horizontally: false)
+        return rows.enumerated().flatMap { index, row in
+            split(row, into: min(perRow, count - index * perRow), horizontally: true)
+        }
+    }
+
+    /// Whether `windows` already fill `targets`, in any order: each window sits on a different
+    /// target, give or take a few points.
+    public static func fills(_ targets: [CGRect], with windows: [CGRect]) -> Bool {
+        guard targets.count == windows.count else { return false }
+        var unmatched = windows
+        for target in targets {
+            guard let index = unmatched.firstIndex(where: { Layout.approximatelyEqual($0, target) }) else {
+                return false
+            }
+            unmatched.remove(at: index)
+        }
+        return true
+    }
+
+    /// Cuts `rect` into equal columns (or rows) that meet without gaps on whole points.
+    private static func split(_ rect: CGRect, into parts: Int, horizontally: Bool) -> [CGRect] {
+        let length = horizontally ? rect.width : rect.height
+        let edges = (0...parts).map { (length * CGFloat($0) / CGFloat(parts)).rounded(.down) }
+        return (0..<parts).map { part in
+            horizontally
+                ? CGRect(x: rect.minX + edges[part], y: rect.minY, width: edges[part + 1] - edges[part],
+                         height: rect.height)
+                : CGRect(x: rect.minX, y: rect.minY + edges[part], width: rect.width,
+                         height: edges[part + 1] - edges[part])
+        }
+    }
 }

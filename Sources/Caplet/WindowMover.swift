@@ -137,6 +137,56 @@ enum WindowMover {
         lastCycle = nil
     }
 
+    /// Frames the frontmost app's windows had right after the last app tile, so apps that
+    /// refuse the exact layout (minimum sizes, character cells) still count as tiled.
+    private static var lastAppTile: (pid: pid_t, achieved: [CGRect])?
+
+    /// Tiles up to `Arrange.maximumAppWindows` of the frontmost app's windows on the focused
+    /// window's display, focused window first. Returns false, leaving everything alone, when
+    /// there's nothing to tile: no Accessibility access, a single or full-screen window, or
+    /// windows that are already tiled.
+    static func tileAppWindows() -> Bool {
+        guard isTrusted, let app = NSWorkspace.shared.frontmostApplication else { return false }
+        let pid = app.processIdentifier
+
+        let appElement = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(appElement, 1.0)
+        guard let window: AXUIElement = copyAttribute(appElement, kAXFocusedWindowAttribute),
+              (copyAttribute(window, "AXFullScreen") as Bool?) != true,
+              let current = try? frame(of: window),
+              let screens = try? visibleScreens(),
+              let index = Layout.screenIndex(for: current, in: screens) else { return false }
+
+        let onScreen = WindowList.frontToBack()
+        let focusedID = WindowList.windowID(of: window) ?? onScreen.first { $0.pid == pid }?.id ?? 0
+        let focused = WindowSnapshot(id: focusedID, pid: pid, frame: current)
+        let owner = WindowList.app(pid: pid)
+        let followers = Arrange.followers(of: focused, frontToBack: onScreen, screens: screens,
+                                          excludingPID: getpid())
+            .filter { $0.pid == pid && owner.windows[$0.id] != nil }
+            .prefix(Arrange.maximumAppWindows - 1)
+        guard !followers.isEmpty else { return false }
+
+        let windows = [(window, current)] + followers.compactMap { follower in
+            owner.windows[follower.id].map { ($0, follower.frame) }
+        }
+        let frames = Arrange.appFrames(windowCount: windows.count, in: screens[index])
+        let currentFrames = windows.map(\.1)
+        if Arrange.fills(frames, with: currentFrames) { return false }
+        if let last = lastAppTile, last.pid == pid, Arrange.fills(last.achieved, with: currentFrames) { return false }
+
+        withEnhancedUIDisabled(appElement) {
+            for ((element, _), target) in zip(windows, frames) {
+                do { try setFrame(of: element, to: target) } catch {
+                    NSLog("Caplet: couldn't tile a window: %@", String(describing: error))
+                }
+            }
+        }
+        lastAppTile = (pid, windows.map { (try? frame(of: $0.0)) ?? .null })
+        lastCycle = nil
+        return true
+    }
+
     /// Visible frames (without menu bar and Dock) in Accessibility coordinates.
     private static func visibleScreens() throws -> [CGRect] {
         guard let primaryHeight = NSScreen.screens.first?.frame.height else { throw TileError.noScreens }

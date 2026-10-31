@@ -33,6 +33,41 @@ final class ArrangeTests: XCTestCase {
         XCTAssertEqual(Arrange.frames(for: .leftAndRight, windowCount: 0, in: laptop), [])
     }
 
+    func testAppFramesPickTheLayoutByWindowCount() {
+        XCTAssertEqual(Arrange.appFrames(windowCount: 2, in: laptop),
+                       Arrange.frames(for: .leftAndRight, windowCount: 2, in: laptop))
+        XCTAssertEqual(Arrange.appFrames(windowCount: 3, in: laptop), [
+            CGRect(x: 0, y: 25, width: 720, height: 875),
+            CGRect(x: 720, y: 25, width: 720, height: 437),
+            CGRect(x: 720, y: 462, width: 720, height: 438),
+        ])
+        XCTAssertEqual(Arrange.appFrames(windowCount: 4, in: laptop),
+                       Arrange.frames(for: .quartersFromTopLeft, windowCount: 4, in: laptop))
+        // Three on top, and the two below share the full width.
+        XCTAssertEqual(Arrange.appFrames(windowCount: 5, in: external), [
+            CGRect(x: 1440, y: 0, width: 640, height: 527),
+            CGRect(x: 2080, y: 0, width: 640, height: 527),
+            CGRect(x: 2720, y: 0, width: 640, height: 527),
+            CGRect(x: 1440, y: 527, width: 960, height: 528),
+            CGRect(x: 2400, y: 527, width: 960, height: 528),
+        ])
+    }
+
+    func testAppFramesStopAtSixWindows() {
+        let six = Arrange.appFrames(windowCount: 6, in: laptop)
+        XCTAssertEqual(six.map(\.width), [480, 480, 480, 480, 480, 480])
+        XCTAssertEqual(Arrange.appFrames(windowCount: 9, in: laptop), six)
+        XCTAssertEqual(Arrange.appFrames(windowCount: 0, in: laptop), [])
+    }
+
+    func testFillsIgnoresOrderButNeedsEveryTarget() {
+        let targets = Arrange.appFrames(windowCount: 3, in: laptop)
+        XCTAssertTrue(Arrange.fills(targets, with: [targets[2], targets[0].insetBy(dx: 1, dy: 1), targets[1]]))
+        XCTAssertFalse(Arrange.fills(targets, with: [targets[0], targets[0], targets[1]]))
+        XCTAssertFalse(Arrange.fills(targets, with: [targets[0], targets[1]]))
+        XCTAssertFalse(Arrange.fills(targets, with: [targets[0], targets[1], targets[2].offsetBy(dx: 10, dy: 0)]))
+    }
+
     func testFollowersKeepStackingOrderAndSkipOddWindows() {
         let focused = WindowSnapshot(id: 1, pid: 100, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
         let windows = [
