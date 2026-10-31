@@ -60,20 +60,4 @@ final class ArrangeTests: XCTestCase {
         XCTAssertEqual(Arrange.followers(of: focused, frontToBack: windows, screens: [laptop, external],
                                          excludingPID: 999).map(\.id), [3])
     }
-
-    func testOptionSwitchesToArrange() {
-        XCTAssertEqual(HyperBindings.command(forKeyCode: 0x00, option: false), .tile(.leftHalf))
-        XCTAssertEqual(HyperBindings.command(forKeyCode: 0x00, option: true), .arrange(.leftAndRight))
-        XCTAssertEqual(HyperBindings.command(forKeyCode: 0x07, option: true), .arrange(.quartersFromBottomRight))
-        XCTAssertEqual(HyperBindings.command(forKeyCode: 0x03, option: true), .tile(.maximize))
-        XCTAssertNil(HyperBindings.command(forKeyCode: 0x05, option: true))
-    }
-
-    func testEveryArrangeActionHasAKey() {
-        for action in ArrangeAction.allCases {
-            XCTAssertNotNil(HyperBindings.keyLabel(for: action), "\(action) has no key")
-        }
-        XCTAssertEqual(HyperBindings.keyLabel(for: .leftAndRight), "A")
-        XCTAssertEqual(HyperBindings.keyLabel(for: .quartersFromTopLeft), "Q")
-    }
 }

@@ -14,18 +14,13 @@ public enum ArrangeAction: String, CaseIterable, Sendable {
     case quartersFromBottomLeft
     case quartersFromBottomRight
 
-    /// The variants listed in the menu; the other quarter variants are shortcut-only.
-    public static let menuCases: [ArrangeAction] = [
-        .leftAndRight, .rightAndLeft, .topAndBottom, .bottomAndTop, .quartersFromTopLeft,
-    ]
-
     public var title: String {
         switch self {
         case .leftAndRight: return "Left & Right"
         case .rightAndLeft: return "Right & Left"
         case .topAndBottom: return "Top & Bottom"
         case .bottomAndTop: return "Bottom & Top"
-        case .quartersFromTopLeft: return "Quarters"
+        case .quartersFromTopLeft: return "Quarters from Top Left"
         case .quartersFromTopRight: return "Quarters from Top Right"
         case .quartersFromBottomLeft: return "Quarters from Bottom Left"
         case .quartersFromBottomRight: return "Quarters from Bottom Right"

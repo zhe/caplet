@@ -11,72 +11,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let statusLine = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private let takeBackItem = NSMenuItem(title: "Take Back Caps Lock", action: #selector(takeBackCapsLock),
                                           keyEquivalent: "")
-    private let cycleItem = NSMenuItem(title: "Cycle Sizes on Repeated Presses",
-                                       action: #selector(toggleCycling), keyEquivalent: "")
-    private let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin),
-                                       keyEquivalent: "")
-    private var loginItemError: String?
-    private let launchSeparator = NSMenuItem.separator()
-    private lazy var launchHeader = sectionHeader("Apps")
-    private var launchers: [Launcher] = []
-    private var launcherItems: [NSMenuItem] = []
-    private var launcherNotes: [String] = []
+    private let appsSeparator = NSMenuItem.separator()
+    private let appsHeader = NSMenuItem.header("Apps")
+    private var appItems: [NSMenuItem] = []
+    /// The menu items running a window command, whose shortcut labels follow the keymap.
+    private var commandItems: [NSMenuItem] = []
+    private var keymap = Keymap.defaults
+    private var settings: SettingsWindowController?
+    private var appNotes: [String] = []
     /// Plain title and drawn shortcut label of each item that shows one, and whether Caplet gave
-    /// it an icon. `NSMenuItem.image` can't tell: macOS 26 returns a default image for Quit
-    /// (`terminate:`) that the status menu doesn't draw.
+    /// it an icon. `NSMenuItem.image` can't tell: for Quit (`terminate:`) it returns a default
+    /// image even after being set to nil, which the status menu doesn't draw.
     private var shortcuts: [ObjectIdentifier: (title: String, label: String, icon: Bool)] = [:]
     private var terminationSignal: DispatchSourceSignal?
 
-    private static let cyclingKey = "cycleSizes"
     /// How far a menu item's icon pushes its title right. AppKit doesn't expose this, so it's
     /// measured from the menu on macOS 26: titles with icons start 26pt right of those without.
     private static let iconColumnWidth: CGFloat = 26
 
     private var cyclingEnabled: Bool {
-        get { UserDefaults.standard.object(forKey: Self.cyclingKey) as? Bool ?? true }
-        set { UserDefaults.standard.set(newValue, forKey: Self.cyclingKey) }
-    }
-
-    private static func shortcutLabel(for action: TileAction) -> String? {
-        HyperBindings.keyLabels[action].map { "⇪\($0)" }
-    }
-
-    private static func shortcutLabel(for action: ArrangeAction) -> String? {
-        HyperBindings.keyLabel(for: action).map { "⌥⇪\($0)" }
-    }
-
-    /// SF Symbols matching the system Window › Move & Resize menu. Those `inset.filled.*`
-    /// names arrived in macOS 15, so each entry carries an older look-alike for macOS 13–14.
-    private static func symbol(for action: TileAction) -> (String, fallback: String) {
-        switch action {
-        case .leftHalf: return ("inset.filled.lefthalf.rectangle", "rectangle.lefthalf.inset.filled")
-        case .rightHalf: return ("inset.filled.righthalf.rectangle", "rectangle.righthalf.inset.filled")
-        case .topHalf: return ("inset.filled.tophalf.rectangle", "rectangle.tophalf.inset.filled")
-        case .bottomHalf: return ("inset.filled.bottomhalf.rectangle", "rectangle.bottomhalf.inset.filled")
-        case .topLeft: return ("inset.filled.topleft.rectangle", "rectangle.inset.topleft.filled")
-        case .topRight: return ("inset.filled.topright.rectangle", "rectangle.inset.topright.filled")
-        case .bottomLeft: return ("inset.filled.bottomleft.rectangle", "rectangle.inset.bottomleft.filled")
-        case .bottomRight: return ("inset.filled.bottomright.rectangle", "rectangle.inset.bottomright.filled")
-        case .maximize: return ("inset.filled.rectangle", "rectangle.inset.filled")
-        case .center: return ("inset.filled.center.rectangle", "rectangle.center.inset.filled")
-        case .nextDisplay: return ("display.2", "display.2")
-        }
-    }
-
-    private static func symbol(for action: ArrangeAction) -> (String, fallback: String) {
-        switch action {
-        case .leftAndRight: return ("inset.filled.lefthalf.righthalf.rectangle", "rectangle.split.2x1")
-        case .rightAndLeft: return ("inset.filled.righthalf.lefthalf.rectangle", "rectangle.split.2x1")
-        case .topAndBottom: return ("inset.filled.tophalf.bottomhalf.rectangle", "rectangle.split.1x2")
-        case .bottomAndTop: return ("inset.filled.bottomhalf.tophalf.rectangle", "rectangle.split.1x2")
-        case .quartersFromTopLeft, .quartersFromTopRight, .quartersFromBottomLeft, .quartersFromBottomRight:
-            return ("inset.filled.topleft.topright.bottomleft.bottomright.rectangle", "rectangle.split.2x2")
-        }
-    }
-
-    private static func image(_ symbol: (String, fallback: String), _ title: String) -> NSImage? {
-        NSImage(systemSymbolName: symbol.0, accessibilityDescription: title)
-            ?? NSImage(systemSymbolName: symbol.fallback, accessibilityDescription: title)
+        UserDefaults.standard.object(forKey: SettingsWindowController.cyclingKey) as? Bool ?? true
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -89,9 +43,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.button?.image = icon
         statusItem.button?.setAccessibilityLabel("Caplet")
         statusItem.menu = buildMenu()
-        reloadLaunchers()
+        reloadKeymap()
         // Unlike didChangeNotification, KVO also reports `defaults write` from other processes.
-        UserDefaults.standard.addObserver(self, forKeyPath: Launchers.defaultsKey, context: nil)
+        UserDefaults.standard.addObserver(self, forKeyPath: Keymap.defaultsKey, context: nil)
 
         WindowMover.requestTrust()
         hyperKey.onStateChange = { [weak self] in self?.updateIcon() }
@@ -128,32 +82,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         for action in TileAction.allCases {
             if action == .topLeft || action == .maximize { menu.addItem(.separator()) }
-            let item = shortcutItem(action.title, Self.shortcutLabel(for: action), #selector(menuAction(_:)),
-                                    image: Self.image(Self.symbol(for: action), action.title))
-            item.representedObject = action.rawValue
-            menu.addItem(item)
+            menu.addItem(commandItem(.tile(action)))
         }
 
+        // No submenus: a submenu makes AppKit reserve an arrow column on every row, which leaves
+        // a gap right of the drawn shortcut labels.
         menu.addItem(.separator())
-        menu.addItem(sectionHeader("Arrange"))
-        for action in ArrangeAction.menuCases {
-            let item = shortcutItem(action.title, Self.shortcutLabel(for: action), #selector(arrangeAction(_:)),
-                                    image: Self.image(Self.symbol(for: action), action.title))
-            item.representedObject = action.rawValue
-            menu.addItem(item)
-        }
-
-        // reloadLaunchers() fills in the apps below the header.
-        menu.addItem(launchSeparator)
-        menu.addItem(launchHeader)
+        menu.addItem(.header("Arrange"))
+        for action in ArrangeAction.allCases { menu.addItem(commandItem(.arrange(action))) }
+        // updateApps() lists the apps below the header.
+        menu.addItem(appsSeparator)
+        menu.addItem(appsHeader)
 
         menu.addItem(.separator())
-        cycleItem.target = self
-        menu.addItem(cycleItem)
-        loginItem.target = self
-        menu.addItem(loginItem)
-
-        menu.addItem(.separator())
+        // macOS 26 picks default images by selector, such as a gear for `openSettings` and an
+        // xmark for `terminate:` (which the status menu doesn't draw). Rows without an icon clear
+        // it, and Settings uses `openSettingsWindow`, which gets none.
+        for item in [statusLine, takeBackItem, permissionItem] { item.image = nil }
         statusLine.isEnabled = false
         statusLine.isHidden = true
         menu.addItem(statusLine)
@@ -161,61 +106,122 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(takeBackItem)
         permissionItem.target = self
         menu.addItem(permissionItem)
+        // Rows with a shortcut label need an icon: a row without one starts left of the others, so
+        // its label has to sit further along its title, and AppKit then sizes the menu as if that
+        // title started after the icon column too, leaving a gap right of every label.
+        menu.addItem(shortcutItem("Settings…", "⌘,", #selector(openSettingsWindow),
+                                  image: NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)))
         menu.addItem(.separator())
-        let quit = shortcutItem("Quit Caplet", "⌘Q", #selector(NSApplication.terminate(_:)))
+        let quit = shortcutItem("Quit Caplet", "⌘Q", #selector(NSApplication.terminate(_:)),
+                                image: NSImage(systemSymbolName: "power", accessibilityDescription: nil))
         quit.target = NSApp
         menu.addItem(quit)
         // AppKit draws real key equivalents in a column right of every title, which the drawn
-        // ⇪ labels can't line up with. This hidden twin keeps ⌘Q working while the menu is open.
+        // ⇪ labels can't line up with. These hidden twins keep ⌘, and ⌘Q working while the menu is open.
+        let settingsKey = NSMenuItem(title: "Settings…", action: #selector(openSettingsWindow), keyEquivalent: ",")
+        settingsKey.target = self
         let quitKey = NSMenuItem(title: "Quit Caplet", action: #selector(NSApplication.terminate(_:)),
                                  keyEquivalent: "q")
-        quitKey.isHidden = true
-        quitKey.allowsKeyEquivalentWhenHidden = true
-        menu.addItem(quitKey)
-
-        alignShortcuts(in: menu)
+        for item in [settingsKey, quitKey] {
+            item.isHidden = true
+            item.allowsKeyEquivalentWhenHidden = true
+            menu.addItem(item)
+        }
         return menu
     }
 
     nonisolated override func observeValue(forKeyPath keyPath: String?, of object: Any?,
                                            change: [NSKeyValueChangeKey: Any]?,
                                            context: UnsafeMutableRawPointer?) {
-        Task { @MainActor in self.reloadLaunchers() }
+        Task { @MainActor in self.reloadKeymap() }
     }
 
-    /// Reads the ⇪ app shortcuts from UserDefaults, hands them to the key tap, and lists them
-    /// in the menu under Apps.
-    private func reloadLaunchers() {
-        let stored = UserDefaults.standard.object(forKey: Launchers.defaultsKey)
-        let config = stored as? [String: Any] ?? [:]
-        let (parsed, problems) = Launchers.parse(config)
-        launchers = parsed
-        launcherNotes = problems.map(\.description)
-        if stored != nil, !(stored is [String: Any]) {
-            launcherNotes.append("App shortcuts need “\(Launchers.defaultsKey)” to be a dictionary")
+    /// Reads the keymap from UserDefaults, moving the app shortcuts of the old `launchers`
+    /// setting into it the first time.
+    private func reloadKeymap() {
+        let defaults = UserDefaults.standard
+        if let saved = Keymap(plist: defaults.object(forKey: Keymap.defaultsKey)) {
+            apply(saved)
+        } else if let launchers = defaults.object(forKey: Keymap.launchersKey) {
+            save(Keymap.migrating(launchers: launchers))
+            defaults.removeObject(forKey: Keymap.launchersKey)
+        } else {
+            apply(.defaults)
         }
-        hyperKey.launchers = Dictionary(uniqueKeysWithValues: parsed.map { ($0.keyCode, $0.bundleID) })
+    }
 
+    private func save(_ keymap: Keymap) {
+        UserDefaults.standard.set(keymap.plist, forKey: Keymap.defaultsKey)
+        apply(keymap)
+    }
+
+    private func apply(_ keymap: Keymap) {
+        self.keymap = keymap
+        hyperKey.keymap = keymap
+        settings?.keymap = keymap
+        updateShortcutLabels()
+    }
+
+    @objc private func openSettingsWindow() {
+        if settings == nil {
+            settings = SettingsWindowController(keymap: keymap) { [weak self] keymap in self?.save(keymap) }
+        }
+        settings?.show()
+    }
+
+    private func commandItem(_ command: HyperCommand) -> NSMenuItem {
+        let item = NSMenuItem(title: command.title, action: #selector(runItem(_:)), keyEquivalent: "")
+        item.target = self
+        item.image = command.image
+        item.representedObject = command
+        commandItems.append(item)
+        return item
+    }
+
+    private func updateShortcutLabels() {
+        for item in commandItems {
+            guard let command = item.representedObject as? HyperCommand else { continue }
+            if let label = keymap.label(for: command) {
+                shortcuts[ObjectIdentifier(item)] = (command.title, label, true)
+            } else {
+                shortcuts[ObjectIdentifier(item)] = nil
+                item.attributedTitle = nil
+            }
+        }
+        if let menu = statusItem.menu { alignShortcuts(in: menu) }
+    }
+
+    /// Lists the app shortcuts, ⇪ ones first, each layer by app name. Rebuilt whenever the menu
+    /// opens, so it also picks up apps installed or moved since.
+    private func updateApps() {
         guard let menu = statusItem.menu else { return }
-        for item in launcherItems {
+        for item in appItems {
             menu.removeItem(item)
             shortcuts[ObjectIdentifier(item)] = nil
         }
-        launcherItems = parsed.enumerated().map { index, launcher in
-            let url = AppLauncher.url(for: launcher.bundleID)
-            if url == nil { launcherNotes.append("⇪\(launcher.key): no app with bundle ID \(launcher.bundleID)") }
-            let name = url.map { FileManager.default.displayName(atPath: $0.path) }
-                .map { $0.hasSuffix(".app") ? String($0.dropLast(4)) : $0 } ?? launcher.bundleID
-            let icon = url.map { NSWorkspace.shared.icon(forFile: $0.path) }
-            icon?.size = NSSize(width: 16, height: 16)
-            let item = shortcutItem(name, "⇪\(launcher.key)", #selector(launchAction(_:)), image: icon)
-            item.tag = index
-            return item
+        appItems = []
+        appNotes = []
+        for layer in HyperLayer.allCases {
+            let apps = (keymap.layers[layer] ?? [:]).compactMap { key, command -> (String, Int, HyperCommand)? in
+                guard case .launch(let bundleID) = command else { return nil }
+                if AppLauncher.url(for: bundleID) == nil, let name = Keyboard.names[key] {
+                    appNotes.append("\(layer.symbol)\(name): no app with bundle ID \(bundleID)")
+                }
+                return (command.title, key, command)
+            }.sorted { ($0.0, $0.1) < ($1.0, $1.1) }
+            for (title, key, command) in apps {
+                let icon = command.image
+                icon?.size = NSSize(width: 16, height: 16)
+                let item = shortcutItem(title, Keyboard.names[key].map { layer.symbol + $0 }, #selector(runItem(_:)),
+                                        image: icon)
+                item.representedObject = command
+                appItems.append(item)
+            }
         }
-        let start = menu.index(of: launchHeader) + 1
-        for (offset, item) in launcherItems.enumerated() { menu.insertItem(item, at: start + offset) }
-        launchSeparator.isHidden = parsed.isEmpty
-        launchHeader.isHidden = parsed.isEmpty
+        let start = menu.index(of: appsHeader) + 1
+        for (offset, item) in appItems.enumerated() { menu.insertItem(item, at: start + offset) }
+        appsSeparator.isHidden = appItems.isEmpty
+        appsHeader.isHidden = appItems.isEmpty
     }
 
     private func shortcutItem(_ title: String, _ label: String?, _ action: Selector,
@@ -230,7 +236,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Key equivalents only accept real modifiers (⌃⌥⇧⌘), so the ⇪ shortcut is drawn into the
     // title. Like a native shortcut column, labels are right-aligned on a grid of equal cells, one
     // symbol per cell, so the key, ⇪ and ⌥ each line up. The grid ends past the widest visible
-    // item, at the menu's right edge.
+    // item, at the menu's right edge (left of the arrow column when the menu has a submenu).
     private func alignShortcuts(in menu: NSMenu) {
         let font = NSFont.menuFont(ofSize: 0)
         func width(_ text: String) -> CGFloat {
@@ -244,12 +250,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let symbols = labelled.map { Array($0.1.label) }
         let cell = ceil(symbols.joined().map { width(String($0)) }.max() ?? 0) + 2
         let columns = CGFloat(symbols.map(\.count).max() ?? 0)
-        let edge = ceil(max(titleWidth + 48 + columns * cell, otherWidth))
+        let edge = ceil(max(titleWidth + 24 + columns * cell, otherWidth))
         let hasIcons = labelled.contains { $0.1.icon }
 
         for ((item, shortcut), symbols) in zip(labelled, symbols) {
             // Tab stops count from the title, and an icon pushes the title right. A row without
-            // one (Quit) starts that much further left, so its stops move right to compensate.
+            // one (Settings…, Quit) starts that much further left, so its stops move right to match.
             let rowEdge = hasIcons && !shortcut.icon ? edge + Self.iconColumnWidth : edge
             // A row only gets the rightmost stops it fills, so its first tab lands in the right cell.
             let paragraph = NSMutableParagraphStyle()
@@ -266,21 +272,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    private func sectionHeader(_ title: String) -> NSMenuItem {
-        if #available(macOS 14, *) { return .sectionHeader(title: title) }
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        item.isEnabled = false
-        return item
-    }
-
     func menuNeedsUpdate(_ menu: NSMenu) {
         // Opening the menu is the natural next step when shortcuts stop working.
         hyperKey.recheck()
-        // Also picks up apps installed or moved since the shortcuts were read.
-        reloadLaunchers()
+        updateApps()
         let trusted = WindowMover.isTrusted
         permissionItem.isHidden = trusted
-        cycleItem.state = cyclingEnabled ? .on : .off
 
         var notes: [String] = []
         if !trusted { notes.append("Accessibility access is off") }
@@ -294,42 +291,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if case .takenOver = hyperKey.state { takeBackItem.isHidden = false } else { takeBackItem.isHidden = true }
 
-        let login = LoginItem.state
-        loginItem.isEnabled = login != .unavailable
-        switch login {
-        case .enabled: loginItem.state = .on
-        case .requiresApproval: loginItem.state = .mixed
-        case .disabled, .unavailable: loginItem.state = .off
-        }
-        if login == .requiresApproval {
-            notes.append("Launch at login is switched off in System Settings › Login Items")
-        }
-        if login == .unavailable { notes.append("Launch at login needs Caplet.app, not swift run") }
-        if let loginItemError { notes.append(loginItemError) }
-        notes += launcherNotes
+        notes += appNotes
 
         statusLine.title = notes.joined(separator: " · ")
         statusLine.isHidden = notes.isEmpty
         alignShortcuts(in: menu)
 
-        for item in menu.items {
-            if item.representedObject is String { item.isEnabled = trusted }
-        }
+        // Window commands need Accessibility access; opening apps doesn't.
+        for item in commandItems { item.isEnabled = trusted }
     }
 
-    @objc private func menuAction(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let action = TileAction(rawValue: raw) else { return }
-        run(.tile(action))
-    }
-
-    @objc private func arrangeAction(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let action = ArrangeAction(rawValue: raw) else { return }
-        run(.arrange(action))
-    }
-
-    @objc private func launchAction(_ sender: NSMenuItem) {
-        guard launchers.indices.contains(sender.tag) else { return }
-        run(.launch(launchers[sender.tag].bundleID))
+    @objc private func runItem(_ sender: NSMenuItem) {
+        guard let command = sender.representedObject as? HyperCommand else { return }
+        run(command)
     }
 
     private func run(_ command: HyperCommand) {
@@ -349,35 +323,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func takeBackCapsLock() {
         hyperKey.takeBack()
-    }
-
-    @objc private func toggleCycling() {
-        cyclingEnabled.toggle()
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        switch LoginItem.state {
-        case .requiresApproval:
-            // Registering again won't help; only the user can flip it back on.
-            LoginItem.openSystemSettings()
-        case .enabled:
-            setLaunchAtLogin(false)
-        case .disabled:
-            setLaunchAtLogin(true)
-        case .unavailable:
-            break
-        }
-    }
-
-    private func setLaunchAtLogin(_ enabled: Bool) {
-        do {
-            try LoginItem.setEnabled(enabled)
-            loginItemError = nil
-        } catch {
-            loginItemError = "Couldn't change launch at login: \(error.localizedDescription)"
-            NSSound.beep()
-            NSLog("Caplet: %@", String(describing: error))
-        }
     }
 
     @objc private func openAccessibilitySettings() {

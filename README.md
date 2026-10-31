@@ -28,7 +28,8 @@ Q  W  E        ↖  ↑  ↗
   Z  X  C       ↙  ↘  center
 ```
 
-The same actions, with their shortcuts, are also in the menu-bar icon's menu.
+These are the default keys. Any of them can be changed in **Settings…** (⌘,), and the same
+actions, with their current shortcuts, are also in the menu-bar icon's menu.
 
 The first press keeps the window's size when it can, and repeated presses cycle sizes:
 
@@ -46,7 +47,7 @@ window has been resized, the cycle never slides it again.
 
 A repeated press advances when the window is still where the last press put it, or already
 sits at one of those sizes. Otherwise it starts again at the first step. Turn this off with
-**Cycle Sizes on Repeated Presses** in the menu. Then halves and quarters always go to ½
+**Cycle sizes on repeated presses** in Settings. Then halves and quarters always go to ½
 (no slide), and Center always keeps the window's size.
 
 ### Arrange
@@ -69,29 +70,36 @@ like Window › Move & Resize › Arrange in macOS Sequoia:
 - With fewer windows than slots, the windows that exist are tiled and the rest of the
   screen stays empty.
 - Nothing is brought to the front, so focus stays where it was. Arrange doesn't cycle sizes.
-- ⌥ with F, C, or Space does the same thing as without it.
+- By default, ⌥ with F, C, or Space does the same thing as without it.
 
-The menu lists the Arrange layouts too. Its **Quarters** item puts the focused window top-left.
+The menu lists the Arrange layouts under **Arrange**.
 
-### App shortcuts
+### Settings
 
-Bind any free letter or digit to an app, so ⇪ and that key opens it:
+**Settings…** in the menu (⌘, while it's open) shows a keyboard with what ⇪ and each key
+does. Keys with a shortcut are filled and show its icon; free keys are outlines.
 
-```bash
-defaults write net.zhezhang.Caplet launchers -dict B com.apple.Safari T com.apple.Terminal
-defaults write net.zhezhang.Caplet launchers -dict-add G com.google.Chrome   # add one more
-defaults delete net.zhezhang.Caplet launchers                                  # remove them all
-```
+- **Click a key** to choose what it does: a window action, an Arrange layout, an app
+  (**Choose Application…**), or **None**.
+- **Hold ⌥, or click either ⌥ key,** to see and change the ⌥⇪ shortcuts. The ⇪ and ⌥⇪
+  layers are separate: changing a key in one leaves the other alone.
+- **Press a key** on your keyboard and it blinks on the drawing, so you can find it.
+- Several keys may run the same action. The menu then shows the first one, reading the
+  keyboard row by row, and prefers ⇪ over ⌥⇪.
+- **Restore Defaults** puts the window keys back as listed above and removes app shortcuts.
+- Keys are matched by physical position, so a shortcut stays on the same key whatever the
+  keyboard layout. On ISO keyboards (British, German, …) Settings draws the L-shaped Return
+  and the extra key next to left Shift. Shortcut labels in the menu name keys by their place
+  on a US keyboard.
 
-Caplet picks up changes right away. Find an app's bundle ID with
-`osascript -e 'id of app "Safari"'`.
+App shortcuts open the app if it isn't running, bring it to the front and unhide it if it
+is, and hide it if it's already in front. Hold ⇪ and tap several app keys to open several
+apps in one go. The menu lists them under **Apps**, and notes any app that's no
+longer installed.
 
-- If the app isn't running, the shortcut opens it. If it's running, the shortcut brings it to
-  the front and unhides it. If it's already in front, the shortcut hides it.
-- Hold ⇪ and tap several app keys to open several apps in one go.
-- Keys are matched by physical position, like the window keys, and named by their place on a
-  US keyboard. The window keys (Q W E A S D Z X F C) can't be used.
-- The menu lists app shortcuts under **Apps**, and notes any entry it can't use.
+Shortcuts are saved in the `keymap` default (`defaults read net.zhezhang.Caplet keymap`).
+App shortcuts made with the older `launchers` default move into it, in both layers, the
+first time Caplet starts.
 
 ### About Caps Lock
 
@@ -138,7 +146,7 @@ Requires macOS 13 or later, on Apple silicon or Intel.
    ```
 
 3. When asked, enable Caplet under System Settings › Privacy & Security › Accessibility.
-   Tick **Launch at Login** in its menu if you want it.
+   Tick **Launch at login** in its Settings if you want it.
 
 To update, quit Caplet from its menu first, so Caps Lock goes back to normal, then replace
 the app with the newer one the same way. Releases are all signed with the same certificate,
@@ -200,8 +208,8 @@ Accessibility access to your terminal app instead.
 
 ### Launch at login
 
-Install the app into `/Applications`, open it from there, and tick **Launch at Login** in the
-menu (off by default):
+Install the app into `/Applications`, open it from there, and tick **Launch at login** in
+Settings (off by default):
 
 ```bash
 ./scripts/bundle.sh --install
@@ -209,7 +217,7 @@ open /Applications/Caplet.app
 ```
 
 The setting lives in macOS, and also appears under System Settings › General › Login Items.
-If you switch it off there, the menu shows the checkbox as mixed (–); clicking it opens that
+If you switch it off there, Settings shows the checkbox as mixed (–); clicking it opens that
 settings page. Use `--install` for later rebuilds too, so the login item keeps pointing at
 the current build. It quits the running copy first, which restores Caps Lock.
 
@@ -264,14 +272,17 @@ plain Foundation, so the tests also run on Linux.
 | `Sources/Caplet/WindowMover.swift` | Accessibility API (`AXUIElement`): finds the frontmost app's focused window, reads its frame, writes the new one. |
 | `Sources/CapletCore/Arrange.swift` | Arrange layouts: which slot each window gets, and which windows behind the focused one may join. |
 | `Sources/Caplet/WindowList.swift` | Lists on-screen windows front to back (`CGWindowListCopyWindowInfo`) and matches them to Accessibility windows by window ID. |
-| `Sources/CapletCore/HyperKey.swift` | Hyper-key bindings, plus reading, merging, and writing `hidutil` key remaps. |
+| `Sources/CapletCore/Keymap.swift` | What ⇪ and ⌥⇪ with each key do: defaults, how they're saved, and moving over the old `launchers` setting. |
+| `Sources/CapletCore/Keyboard.swift` | The keyboard drawn in Settings (ANSI and ISO), and the keys' names and reading order. |
+| `Sources/CapletCore/HyperKey.swift` | Reading, merging, and writing `hidutil` key remaps. |
 | `Sources/Caplet/HyperKeyController.swift` | Remaps Caps Lock to F18 with `hidutil`. A keyboard event tap tracks F18 being held and swallows the bound keys. Caps Lock alone can't do this, because it only reports on/off toggles. |
-| `Sources/CapletCore/Launcher.swift` | Reads the app shortcuts from settings: key names to key codes, and which entries can't be used. |
 | `Sources/Caplet/AppLauncher.swift` | Opens, brings forward, or hides the app for an app shortcut (`NSWorkspace`). |
 | `Sources/CapletCore/CapsTap.swift` | Tells a tap of Caps Lock (toggle capitals) apart from holding it for a shortcut. |
 | `Sources/Caplet/CapsLockState.swift` | Flips the system Caps Lock state through IOHIDSystem, the same state the physical key toggles. |
 | `Sources/Caplet/LoginItem.swift` | Launch at login through `SMAppService.mainApp`. |
 | `Sources/Caplet/AppDelegate.swift` | Menu-bar item, menu, and shortcut wiring. |
+| `Sources/Caplet/SettingsWindow.swift` | The Settings window: the clickable keyboard, the ⌥⇪ layer, and the general options. |
+| `Sources/Caplet/CommandStyle.swift` | Titles and icons of commands, shared by the menu and Settings. |
 | `Resources/` | The app icon (`AppIcon.icns`) and the menu-bar icon (`MenuBarIcon.png`, a 36×36 black-on-transparent template image shown at 18 points). `bundle.sh` copies both into the app. |
 
 Details handled:
