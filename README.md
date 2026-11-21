@@ -28,6 +28,15 @@ Q  W  E        ↖  ↑  ↗
   Z  X  C       ↙  ↘  center
 ```
 
+<p>
+  <img src="docs/demos/small/1-halves.gif" alt="Caps Lock with W, S, A and D moves a window to each half" width="49%">
+  <img src="docs/demos/small/2-quarters.gif" alt="Caps Lock with Q, E, X and Z moves a window to each corner" width="49%">
+</p>
+<p>
+  <img src="docs/demos/small/4-center.gif" alt="Caps Lock with C centers a window and F maximizes it" width="49%">
+  <img src="docs/demos/small/6-display.gif" alt="Caps Lock with Space moves a window to the other display" width="49%">
+</p>
+
 These are the default keys. Any of them can be changed in **Settings…** (⌘,), and the same
 actions, with their current shortcuts, are also in the menu-bar icon's menu.
 
@@ -40,6 +49,8 @@ The first press keeps the window's size when it can, and repeated presses cycle 
   corner. Then the width cycles ½ → ⅔ → ⅓ the same way; the height stays half the screen.
 - **Center:** the first press centers the window at its own size. The second resizes it to ⅔
   of the screen's width and height. Further presses keep it at ⅔.
+
+<p><img src="docs/demos/small/3-cycle.gif" alt="Pressing Caps Lock with D four times slides the window to the edge, then sizes it ½, ⅔ and ⅓" width="49%"></p>
 
 The slide is skipped, and the first press goes straight to ½, when the window is bigger than
 the half or quarter, already against that edge, or within a few points of ½ anyway. Once a
@@ -62,6 +73,8 @@ like Window › Move & Resize › Arrange in macOS Sequoia:
 | Top & Bottom | ⌥⇪W | top; the next window goes bottom |
 | Bottom & Top | ⌥⇪S | bottom; the next window goes top |
 | Quarters | ⌥⇪Q / ⌥⇪E / ⌥⇪Z / ⌥⇪X | into that corner; the next three windows fill the other corners in reading order |
+
+<p><img src="docs/demos/small/5-arrange.gif" alt="Option and Caps Lock with A tiles two windows side by side, then with Q tiles four windows in quarters" width="49%"></p>
 
 - "Behind" means the stacking order, so the windows you used most recently join first.
   They can come from any app.
@@ -100,6 +113,11 @@ focused window goes top left, and windows past the sixth stay where they are. Th
 press then hides the app, and its windows are still tiled when it comes back, so presses
 go back to showing and hiding until a window is moved, opened or closed. Tiling needs
 Accessibility access; without it, app shortcuts only show and hide.
+
+<p>
+  <img src="docs/demos/small/7-apps.gif" alt="Caps Lock with B opens Chrome, hides it, then shows it again" width="49%">
+  <img src="docs/demos/small/8-app-windows.gif" alt="Caps Lock with B brings Chrome forward, tiles its three windows, hides it, then shows it still tiled" width="49%">
+</p>
 
 Hold ⇪ and tap several app keys to open several apps in one go. The menu lists them under
 **Apps**, and notes any app that's no longer installed.

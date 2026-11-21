@@ -6,3 +6,5 @@ DerivedData/
 .DS_Store
 *.cer
 *.p12
+docs/demos/*
+!docs/demos/small/

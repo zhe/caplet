@@ -1,0 +1,417 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Caplet demo</title>
+<!--
+  One scene per clip, drawn at time t by render(t) so record.cjs can capture every frame.
+  Open demo.html#halves (or any clip name below) in a browser to watch it play live.
+-->
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1280px; height: 720px; overflow: hidden; background: #062730;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased; }
+#stage { position: absolute; inset: 0; overflow: hidden;
+  background: radial-gradient(1200px 800px at 25% 15%, #155b6b 0%, #0a3c48 45%, #062730 100%); }
+
+#header { position: absolute; left: 48px; top: 30px; display: flex; align-items: center; gap: 16px; }
+#header img { width: 60px; height: 60px; }
+#title { color: #fff; font-size: 30px; font-weight: 700; letter-spacing: -0.4px; }
+#subtitle { color: #bfe0e6; font-size: 17px; margin-top: 4px; }
+#brand { position: absolute; right: 48px; top: 48px; color: #f6c344; font-weight: 700; font-size: 22px; }
+
+.screen { position: absolute; border-radius: 6px; overflow: hidden;
+  background: linear-gradient(140deg, #f4dba6 0%, #eaa66c 28%, #bb627b 60%, #4b4f90 100%);
+  box-shadow: 0 0 0 7px #16191d, 0 0 0 8px #3a4048, 0 30px 60px rgba(0,0,0,.45); }
+.menubar { position: absolute; left: 0; right: 0; top: 0; height: 22px; display: flex; align-items: center;
+  gap: 14px; padding: 0 12px; font-size: 12px; color: #1d1d1f; background: rgba(255,255,255,.45);
+  backdrop-filter: blur(12px); }
+.menubar b { font-weight: 700; }
+.menubar .right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.menubar img { width: 15px; height: 15px; }
+.screen.small .menubar span.menu { display: none; }
+
+#windows { position: absolute; inset: 0; }
+.win { position: absolute; border-radius: 9px; background: #fff; overflow: hidden;
+  box-shadow: 0 0 0 0.5px rgba(0,0,0,.3), 0 14px 34px rgba(0,0,0,.35); }
+.win .bar { position: absolute; left: 0; right: 0; top: 0; height: 24px; background: #ececec;
+  border-bottom: 1px solid #d4d4d4; display: flex; align-items: center; gap: 6px; padding: 0 9px; }
+.win .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.win .name { position: absolute; left: 50px; right: 50px; top: 5px; text-align: center; font-size: 11px;
+  font-weight: 600; color: #4a4a4a; white-space: nowrap; overflow: hidden; }
+.win .body { position: absolute; top: 24px; left: 0; right: 0; bottom: 0; overflow: hidden; }
+.win.inactive .dot { background: #d0d0d0 !important; }
+.win.inactive .name { color: #9a9a9a; }
+.win.chrome .bar { background: #dfe3e8; border-bottom: none; }
+.win.chrome .name { left: 62px; right: auto; top: 4px; width: 42%; max-width: 160px; height: 20px; padding: 3px 9px;
+  background: #fff; border-radius: 7px 7px 0 0; text-align: left; font-weight: 500; color: #333; text-overflow: ellipsis; }
+.chromeicon { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: -2px;
+  background: radial-gradient(circle, #4285f4 0 27%, #fff 28% 37%, transparent 38%),
+    conic-gradient(from -60deg, #ea4335 0 120deg, #fbbc05 0 240deg, #34a853 0); }
+.win.dark .bar { background: #2d2d2f; border-bottom-color: #111; }
+.win.dark .name { color: #ddd; }
+.line { height: 6px; border-radius: 3px; margin: 9px 0; }
+
+.ghost { position: absolute; border: 2px solid #f6c344; border-radius: 10px; background: rgba(246,195,68,.16);
+  pointer-events: none; }
+
+#keyboard { position: absolute; left: 871px; top: 172px; width: 361px; height: 221px; }
+.key { position: absolute; height: 50px; border-radius: 10px; background: #0f3a44; border: 1px solid #2a6170;
+  box-shadow: 0 3px 0 #072229; color: #cfe6ea; font-weight: 600; }
+.key .lab { position: absolute; left: 0; right: 0; top: 12px; text-align: center; font-size: 19px; }
+.key.mod .lab { left: 10px; right: auto; top: auto; bottom: 6px; font-size: 11px; font-weight: 500; text-align: left; }
+.key.mod .sym { position: absolute; right: 9px; top: 5px; font-size: 15px; }
+.key .gl { position: absolute; right: 5px; top: 3px; font-size: 11px; color: #f6c344; }
+.key.dim { opacity: .35; }
+.key.down { background: #f6c344; color: #16323a; border-color: #ffe08a; box-shadow: 0 1px 0 #8c6a14;
+  transform: translateY(2px); opacity: 1; }
+.key.down .gl { color: #16323a; }
+
+#keycast { position: absolute; left: 871px; top: 440px; width: 361px; text-align: center; }
+#chips { display: flex; justify-content: center; align-items: center; gap: 10px; height: 56px; }
+.chip { min-width: 56px; height: 56px; border-radius: 12px; background: #f6c344; color: #16323a; font-size: 26px;
+  font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 14px;
+  box-shadow: 0 3px 0 #8c6a14; }
+.plus { color: #8fc3cc; font-size: 22px; font-weight: 600; }
+#action { color: #fff; font-size: 26px; font-weight: 700; margin-top: 18px; letter-spacing: -0.3px; }
+#detail { color: #9fcbd3; font-size: 15px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="header">
+    <img src="../../docs/icon.png" alt="">
+    <div><div id="title"></div><div id="subtitle"></div></div>
+  </div>
+  <div id="brand">Caplet</div>
+  <div id="screens"></div>
+  <div id="windows"></div>
+  <div id="keyboard"></div>
+  <div id="keycast"><div id="chips"></div><div id="action"></div><div id="detail"></div></div>
+</div>
+<script>
+// ---------- Scene data ----------
+// Window rects are [x, y, width, height] as fractions of a screen's visible area (below the
+// menu bar), the same way Caplet computes them. Times are in milliseconds.
+
+const ONE_SCREEN = [{ x: 40, y: 128, w: 800, h: 500 }];
+const TWO_SCREENS = [
+  { x: 48, y: 236, w: 456, h: 285 },
+  { x: 540, y: 315, w: 300, h: 206, small: true },
+];
+const BIG = [0.21, 0.19, 0.58, 0.62];
+const backdrop = (id = 'safari') => ({ id, app: 'safari', rect: [0.52, 0.08, 0.44, 0.5] });
+
+const CLIPS = {
+  halves: {
+    title: 'Halves', subtitle: 'Hold Caps Lock and press W A S D',
+    keys: ['W', 'A', 'S', 'D'],
+    screens: ONE_SCREEN,
+    windows: [{ id: 'main', app: 'notes', rect: BIG }, backdrop()],
+    holds: [{ keys: ['caps'], from: 700, to: 4700 }],
+    steps: [
+      { at: 1100, key: 'W', label: 'Top half', moves: { main: [0, 0, 1, 0.5] } },
+      { at: 2100, key: 'A', label: 'Left half', moves: { main: [0, 0, 0.5, 1] } },
+      { at: 3100, key: 'S', label: 'Bottom half', moves: { main: [0, 0.5, 1, 0.5] } },
+      { at: 4100, key: 'D', label: 'Right half', moves: { main: [0.5, 0, 0.5, 1] } },
+    ],
+    duration: 5800,
+  },
+  quarters: {
+    title: 'Quarters', subtitle: 'Hold Caps Lock and press Q E X Z for the corners',
+    keys: ['Q', 'E', 'Z', 'X'],
+    screens: ONE_SCREEN,
+    windows: [{ id: 'main', app: 'notes', rect: BIG }, backdrop()],
+    holds: [{ keys: ['caps'], from: 700, to: 4700 }],
+    steps: [
+      { at: 1100, key: 'Q', label: 'Top-left quarter', moves: { main: [0, 0, 0.5, 0.5] } },
+      { at: 2100, key: 'E', label: 'Top-right quarter', moves: { main: [0.5, 0, 0.5, 0.5] } },
+      { at: 3100, key: 'X', label: 'Bottom-right quarter', moves: { main: [0.5, 0.5, 0.5, 0.5] } },
+      { at: 4100, key: 'Z', label: 'Bottom-left quarter', moves: { main: [0, 0.5, 0.5, 0.5] } },
+    ],
+    duration: 5800,
+  },
+  cycle: {
+    title: 'Cycle sizes', subtitle: 'Press again: slide to the edge, then ½ → ⅔ → ⅓',
+    keys: ['D'],
+    screens: ONE_SCREEN,
+    windows: [{ id: 'main', app: 'notes', rect: [0.07, 0.3, 0.34, 0.46] }, { id: 'safari', app: 'safari', rect: [0.04, 0.05, 0.42, 0.44] }],
+    holds: [{ keys: ['caps'], from: 700, to: 4700 }],
+    steps: [
+      { at: 1100, key: 'D', label: 'Slide to the right edge', detail: 'Fits already, so it keeps its size', moves: { main: [0.66, 0.3, 0.34, 0.46] } },
+      { at: 2100, key: 'D', label: 'Right ½', moves: { main: [0.5, 0, 0.5, 1] } },
+      { at: 3100, key: 'D', label: 'Right ⅔', moves: { main: [1 / 3, 0, 2 / 3, 1] } },
+      { at: 4100, key: 'D', label: 'Right ⅓', moves: { main: [2 / 3, 0, 1 / 3, 1] } },
+    ],
+    duration: 5800,
+  },
+  center: {
+    title: 'Maximize & center', subtitle: 'F fills the screen, C centers the window',
+    keys: ['F', 'C'],
+    screens: ONE_SCREEN,
+    windows: [{ id: 'main', app: 'notes', rect: [0.05, 0.5, 0.4, 0.42] }, backdrop()],
+    holds: [{ keys: ['caps'], from: 700, to: 3700 }],
+    steps: [
+      { at: 1100, key: 'C', label: 'Center', detail: 'Keeps the window\u2019s size', moves: { main: [0.3, 0.29, 0.4, 0.42] } },
+      { at: 2100, key: 'F', label: 'Maximize', detail: 'Fills the visible screen', moves: { main: [0, 0, 1, 1] } },
+      { at: 3100, key: 'C', label: 'Center at ⅔', detail: 'Press again for ⅔ of the screen', moves: { main: [1 / 6, 1 / 6, 2 / 3, 2 / 3] } },
+    ],
+    duration: 4900,
+  },
+  arrange: {
+    title: 'Arrange', subtitle: 'Add Option to tile the windows right behind it',
+    keys: ['A', 'Q'], mods: ['opt'],
+    screens: ONE_SCREEN,
+    windows: [
+      { id: 'notes', app: 'notes', rect: [0.25, 0.22, 0.46, 0.56] },
+      { id: 'safari', app: 'safari', rect: [0.45, 0.06, 0.48, 0.58] },
+      { id: 'term', app: 'terminal', rect: [0.05, 0.42, 0.42, 0.5] },
+      { id: 'mail', app: 'mail', rect: [0.06, 0.05, 0.44, 0.5] },
+    ],
+    holds: [{ keys: ['opt', 'caps'], from: 700, to: 1700 }, { keys: ['opt', 'caps'], from: 2600, to: 3600 }],
+    steps: [
+      { at: 1150, key: 'A', label: 'Left & Right', detail: 'The next window fills the other half',
+        moves: { notes: [0, 0, 0.5, 1], safari: [0.5, 0, 0.5, 1] } },
+      { at: 3050, key: 'Q', label: 'Quarters', detail: 'The next three fill the other corners',
+        moves: { notes: [0, 0, 0.5, 0.5], safari: [0.5, 0, 0.5, 0.5], term: [0, 0.5, 0.5, 0.5], mail: [0.5, 0.5, 0.5, 0.5] } },
+    ],
+    duration: 5000,
+  },
+  display: {
+    title: 'Next display', subtitle: 'Space sends it to the other screen, same relative size and place',
+    keys: ['space'],
+    screens: TWO_SCREENS,
+    windows: [{ id: 'main', app: 'notes', screen: 0, rect: [0.08, 0.14, 0.55, 0.62] }, { id: 'safari', app: 'safari', screen: 1, rect: [0.3, 0.12, 0.62, 0.7] }],
+    holds: [{ keys: ['caps'], from: 700, to: 3200 }],
+    steps: [
+      { at: 1100, key: 'space', label: 'Next display', moves: { main: { screen: 1, rect: [0.08, 0.14, 0.55, 0.62] } } },
+      { at: 2600, key: 'space', label: 'Next display', detail: 'And back again', moves: { main: { screen: 0, rect: [0.08, 0.14, 0.55, 0.62] } } },
+    ],
+    duration: 4400,
+  },
+  apps: {
+    title: 'App shortcuts', subtitle: 'Give an app a key: one press opens it, the next hides it',
+    keys: ['B'],
+    screens: ONE_SCREEN,
+    windows: [
+      { id: 'chrome', app: 'chrome', title: 'New Tab', tint: ['#8ab4f8', '#c3dafe'], rect: [0.3, 0.12, 0.62, 0.76], hidden: true },
+      { id: 'notes', app: 'notes', rect: [0.06, 0.08, 0.5, 0.62] },
+      { id: 'term', app: 'terminal', rect: [0.42, 0.44, 0.48, 0.48] },
+    ],
+    front: 'notes',
+    holds: [{ keys: ['caps'], from: 800, to: 1450 }, { keys: ['caps'], from: 2300, to: 2950 }, { keys: ['caps'], from: 3800, to: 4450 }],
+    steps: [
+      { at: 1100, key: 'B', label: 'Open Chrome', detail: 'Not running, so it launches', delay: 260, show: { chrome: true }, front: 'chrome' },
+      { at: 2600, key: 'B', label: 'Hide Chrome', detail: 'Already in front, so it hides', show: { chrome: false }, front: 'notes' },
+      { at: 4100, key: 'B', label: 'Show Chrome', detail: 'Running, so it comes back to the front', show: { chrome: true }, front: 'chrome' },
+    ],
+    duration: 5700,
+  },
+  'app-windows': {
+    title: 'App shortcuts with several windows', subtitle: 'Press again while it’s in front to tile its windows',
+    keys: ['B'],
+    screens: ONE_SCREEN,
+    windows: [
+      { id: 'c1', app: 'chrome', title: 'zhe/caplet', tint: ['#6e7781', '#c9d1d9'], rect: [0.22, 0.2, 0.5, 0.62] },
+      { id: 'c2', app: 'chrome', title: 'Calendar', tint: ['#8ab4f8', '#d2e3fc'], rect: [0.46, 0.06, 0.5, 0.56] },
+      { id: 'c3', app: 'chrome', title: 'Maps', tint: ['#81c995', '#fde293'], rect: [0.04, 0.36, 0.44, 0.56] },
+      { id: 'notes', app: 'notes', rect: [0.36, 0.3, 0.56, 0.64] },
+    ],
+    front: 'notes',
+    holds: [{ keys: ['caps'], from: 800, to: 1450 }, { keys: ['caps'], from: 2200, to: 2850 }, { keys: ['caps'], from: 3600, to: 4250 }, { keys: ['caps'], from: 5000, to: 5650 }],
+    steps: [
+      { at: 1100, key: 'B', label: 'Bring Chrome forward', detail: 'Running behind Notes', front: 'chrome' },
+      { at: 2500, key: 'B', label: 'Tile its windows', detail: 'In front with several windows, so it tiles them first',
+        moves: { c1: [0, 0, 0.5, 1], c2: [0.5, 0, 0.5, 0.5], c3: [0.5, 0.5, 0.5, 0.5] } },
+      { at: 3900, key: 'B', label: 'Hide Chrome', detail: 'Already tiled, so it hides', show: { c1: false, c2: false, c3: false }, front: 'notes' },
+      { at: 5300, key: 'B', label: 'Show Chrome', detail: 'Its windows are still tiled', show: { c1: true, c2: true, c3: true }, front: 'chrome' },
+    ],
+    duration: 6900,
+  },
+};
+
+const CHROME = '\u0001';
+const KEYS = [
+  // row, x, width, id, label, glyph, modifier symbol
+  [0, 0, 58, 'tab', 'tab', '', '⇥'], ...row(0, 65, 'QWERT', '↖↑↗  '),
+  [1, 0, 68, 'caps', 'caps lock', '', '⇪'], ...row(1, 75, 'ASDFG', '←↓→⤢ '),
+  [2, 0, 76, 'shift', 'shift', '', '⇧'], ...row(2, 83, 'ZXCVB', '↙↘◎ ' + CHROME),
+  [3, 0, 50, 'ctrl', 'control', '', '⌃'], [3, 57, 50, 'opt', 'option', '', '⌥'], [3, 114, 64, 'cmd', 'command', '', '⌘'], [3, 185, 176, 'space', 'space', '', '⇆'],
+];
+function row(r, x, letters, glyphs) {
+  return [...letters].map((k, i) => [r, x + i * 57, 50, k, k, [...glyphs][i].trim()]);
+}
+const CHIP = { caps: '⇪', opt: '⌥', space: 'Space' };
+
+const APPS = {
+  chrome: { name: 'Google Chrome', dark: false, body: (b, w) => {
+    b.innerHTML = `<div style="height:24px;background:#fff;border-bottom:1px solid #e3e3e3;display:flex;align-items:center;padding:0 10px">
+      <div style="flex:1;height:14px;border-radius:7px;background:#f1f3f4"></div></div>
+      <div style="padding:12px 16px"><div style="height:52px;border-radius:8px;background:linear-gradient(90deg,${w.tint[0]},${w.tint[1]})"></div>
+      ${[64, 88, 80, 46, 84, 70, 58].map((x) => `<div class="line" style="width:${x}%;background:#e0e2e6"></div>`).join('')}</div>`;
+  } },
+  notes: { name: 'Notes', dark: false, body: (b) => {
+    b.style.background = '#fff';
+    b.innerHTML = `<div style="position:absolute;left:0;top:0;bottom:0;width:32%;background:#f6f1df;border-right:1px solid #e6dfc6;padding:6px 10px">
+      ${[78, 60, 70, 52, 66, 58].map((w, i) => `<div class="line" style="width:${w}%;background:${i === 0 ? '#e9b949' : '#dcd3b5'}"></div>`).join('')}</div>
+      <div style="position:absolute;left:32%;right:0;top:0;bottom:0;padding:10px 14px">
+      <div class="line" style="height:9px;width:46%;background:#3a3a3c"></div>
+      ${[92, 84, 88, 60, 90, 76, 82, 40, 86, 70].map((w) => `<div class="line" style="width:${w}%;background:#d8d8dc"></div>`).join('')}</div>`;
+  } },
+  safari: { name: 'Safari', dark: false, body: (b) => {
+    b.innerHTML = `<div style="height:22px;background:#f3f3f3;border-bottom:1px solid #ddd;display:flex;align-items:center;justify-content:center">
+      <div style="width:46%;height:12px;border-radius:6px;background:#e1e1e4"></div></div>
+      <div style="padding:10px 14px"><div style="height:46px;border-radius:6px;background:linear-gradient(90deg,#7fb7d9,#a5d2c4)"></div>
+      ${[70, 90, 84, 50, 88, 64, 80].map((w) => `<div class="line" style="width:${w}%;background:#dcdce0"></div>`).join('')}</div>`;
+  } },
+  terminal: { name: 'Terminal', dark: true, body: (b) => {
+    b.style.background = '#1d1f21';
+    b.innerHTML = `<div style="padding:6px 10px">${[[30, '#6fd38c'], [62, '#9aa0a6'], [48, '#9aa0a6'], [24, '#6fd38c'], [70, '#9aa0a6'], [40, '#e5c07b'], [56, '#9aa0a6'], [18, '#6fd38c']]
+      .map(([w, c]) => `<div class="line" style="width:${w}%;background:${c};opacity:.85"></div>`).join('')}</div>`;
+  } },
+  mail: { name: 'Mail', dark: false, body: (b) => {
+    b.innerHTML = `<div style="position:absolute;left:0;top:0;bottom:0;width:38%;border-right:1px solid #e2e2e2;padding:4px 10px">
+      ${[0, 1, 2, 3, 4].map((i) => `<div style="padding:5px 0;border-bottom:1px solid #eee"><div class="line" style="margin:3px 0;width:${50 + i * 7}%;background:${i === 0 ? '#2f7cf6' : '#bcbcc2'}"></div><div class="line" style="margin:3px 0;width:80%;background:#e0e0e4"></div></div>`).join('')}</div>
+      <div style="position:absolute;left:38%;right:0;top:0;bottom:0;padding:12px 14px">
+      <div class="line" style="height:9px;width:52%;background:#3a3a3c"></div>
+      ${[88, 92, 74, 85, 60].map((w) => `<div class="line" style="width:${w}%;background:#dcdce0"></div>`).join('')}</div>`;
+  } },
+};
+
+// ---------- Setup ----------
+let clip, windows, ghosts, keyEls;
+const MENU = 22;
+const $ = (id) => document.getElementById(id);
+const visible = (s) => ({ x: s.x, y: s.y + MENU, w: s.w, h: s.h - MENU });
+const toPx = (screen, r) => { const v = visible(clip.screens[screen]); return [v.x + r[0] * v.w, v.y + r[1] * v.h, r[2] * v.w, r[3] * v.h]; };
+const moveTarget = (m) => Array.isArray(m) ? toPx(0, m) : toPx(m.screen, m.rect);
+
+function setClip(name) {
+  clip = CLIPS[name];
+  $('title').textContent = clip.title;
+  $('subtitle').textContent = clip.subtitle;
+
+  $('screens').innerHTML = '';
+  for (const s of clip.screens) {
+    const el = document.createElement('div');
+    el.className = 'screen' + (s.small ? ' small' : '');
+    Object.assign(el.style, { left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' });
+    el.innerHTML = `<div class="menubar"><span>\uF8FF</span><b></b><span class="menu">File</span><span class="menu">Edit</span><span class="menu">View</span>
+      <div class="right"><img src="../../Resources/MenuBarIcon.png" alt=""><span>Sat 21 Nov 09:41</span></div></div>`;
+    $('screens').appendChild(el);
+  }
+
+  $('windows').innerHTML = '';
+  windows = clip.windows.map((w, i) => {
+    const app = APPS[w.app];
+    const el = document.createElement('div');
+    el.className = 'win' + (app.dark ? ' dark' : '') + (w.app === 'chrome' ? ' chrome' : '');
+    el.innerHTML = `<div class="bar"><div class="dot" style="background:#ff5f57"></div><div class="dot" style="background:#febc2e"></div><div class="dot" style="background:#28c840"></div><div class="name">${w.title || app.name}</div></div><div class="body"></div>`;
+    app.body(el.querySelector('.body'), w);
+    $('windows').appendChild(el);
+    // The first window listed for an app is its focused one.
+    const focused = clip.windows.findIndex((o) => o.app === w.app) === i;
+    return { id: w.id, app: w.app, z: 100 - i, focused, el, start: toPx(w.screen || 0, w.rect), shown: w.hidden ? 0 : 1 };
+  });
+
+  ghosts = [];
+  for (const step of clip.steps) {
+    for (const [id, m] of Object.entries(step.moves || {})) {
+      const el = document.createElement('div');
+      el.className = 'ghost';
+      const [x, y, w, h] = moveTarget(m);
+      Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px', zIndex: 300 });
+      $('windows').appendChild(el);
+      ghosts.push({ el, at: step.at });
+    }
+  }
+
+  const relevant = new Set(['caps', ...(clip.mods || []), ...clip.keys]);
+  $('keyboard').innerHTML = '';
+  keyEls = {};
+  for (const [row, x, w, id, label, glyph, sym] of KEYS) {
+    const el = document.createElement('div');
+    el.className = 'key' + (sym ? ' mod' : '') + (relevant.has(id) ? '' : ' dim');
+    Object.assign(el.style, { left: x + 'px', top: row * 57 + 'px', width: w + 'px' });
+    el.innerHTML = sym ? `<span class="sym">${sym}</span><span class="lab">${label}</span>`
+      : `<span class="lab">${label}</span>${glyph ? `<span class="gl">${glyph === CHROME ? '<i class="chromeicon"></i>' : glyph}</span>` : ''}`;
+    $('keyboard').appendChild(el);
+    keyEls[id] = el;
+  }
+  render(0);
+}
+
+// ---------- Rendering ----------
+const MOVE_DELAY = 60, MOVE_TIME = 280, KEY_TIME = 230, FADE = 280;
+const easeOut = (p) => 1 - Math.pow(1 - p, 3);
+const clamp01 = (p) => Math.max(0, Math.min(1, p));
+const lerp = (a, b, p) => a.map((v, i) => v + (b[i] - v) * p);
+
+function render(t) {
+  // The app in front: its windows stack on top and its focused window is active.
+  let front = clip.front || clip.windows[0].app;
+  for (const s of clip.steps) if (s.front && t >= s.at + MOVE_DELAY + (s.delay || 0)) front = s.front;
+  document.querySelectorAll('.menubar b').forEach((b) => { b.textContent = APPS[front].name; });
+
+  // Windows: replay every move, show and hide up to t.
+  for (const w of windows) {
+    let rect = w.start, shown = w.shown;
+    for (const step of clip.steps) {
+      const start = step.at + MOVE_DELAY + (step.delay || 0);
+      if (t < start) continue;
+      const p = easeOut(clamp01((t - start) / MOVE_TIME));
+      const m = step.moves && step.moves[w.id];
+      if (m) rect = lerp(rect, moveTarget(m), p);
+      if (step.show && w.id in step.show) shown += ((step.show[w.id] ? 1 : 0) - shown) * p;
+    }
+    const [x, y, ww, h] = rect;
+    Object.assign(w.el.style, { left: x + 'px', top: y + 'px', width: ww + 'px', height: h + 'px',
+      opacity: shown, transform: `scale(${0.92 + 0.08 * shown})`, zIndex: w.z + (w.app === front ? 100 : 0) });
+    w.el.classList.toggle('inactive', !(w.focused && w.app === front));
+  }
+  // Fade the windows in and out so the clip loops cleanly.
+  $('windows').style.opacity = Math.min(clamp01(t / FADE), clamp01((clip.duration - t) / FADE));
+
+  // Target outline: flashes where the window is going.
+  for (const g of ghosts) {
+    const p = (t - g.at) / 520;
+    g.el.style.display = p >= 0 && p < 1 ? 'block' : 'none';
+    g.el.style.opacity = p < 0.12 ? p / 0.12 : 1 - (p - 0.12) / 0.88;
+  }
+
+  // Keys held or pressed at t.
+  const down = new Set();
+  for (const h of clip.holds) if (t >= h.from && t < h.to) h.keys.forEach((k) => down.add(k));
+  for (const s of clip.steps) if (t >= s.at - 40 && t < s.at + KEY_TIME) down.add(s.key);
+  for (const [id, el] of Object.entries(keyEls)) el.classList.toggle('down', down.has(id));
+
+  // Keycast: the latest combo and what it did.
+  const i = clip.steps.findLastIndex((s) => t >= s.at - 40);
+  const step = clip.steps[i];
+  const next = clip.steps[i + 1];
+  let opacity = 0;
+  if (step) {
+    const end = next ? next.at - 40 : clip.duration - FADE;
+    opacity = Math.min(clamp01((t - step.at + 40) / 120), clamp01((end - t) / 160));
+    const mods = clip.holds.find((h) => step.at >= h.from && step.at < h.to).keys;
+    $('chips').innerHTML = [...mods, step.key].map((k) => `<div class="chip">${CHIP[k] || k}</div>`).join('<div class="plus">+</div>');
+    $('action').textContent = step.label;
+    $('detail').textContent = step.detail || '';
+  }
+  $('keycast').style.opacity = opacity;
+}
+
+// Live playback when opened directly in a browser.
+window.CLIPS = CLIPS;
+window.setClip = setClip;
+window.render = render;
+setClip(location.hash.slice(1) || 'halves');
+if (!navigator.webdriver) {
+  const t0 = performance.now();
+  const tick = () => { render((performance.now() - t0) % clip.duration); requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>
