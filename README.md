@@ -147,6 +147,13 @@ relaunch it, log out, or run:
 hidutil property --set '{"UserKeyMapping":[]}'   # also clears any other hidutil remaps
 ```
 
+Password fields, the login screen's included, turn on secure input, which hides keys from
+other apps, so Caplet can't see the key there. While secure input is on, the screen is locked,
+the Mac is asleep, or another user is logged in, Caplet lifts the remap: Caps Lock is plain
+Caps Lock and the ⇪ shortcuts pause, and the menu says so. The remap comes back once keys
+reach Caplet again. If the shortcuts stay paused, an app may have left secure input on;
+quitting or switching away from it usually ends it.
+
 Caplet checks the remap again after the Mac wakes, when a keyboard is connected, and when
 you open its menu, and puts it back on any keyboard that lost it. Only one app can remap
 Caps Lock at a time, though. If another one has done so since (Raycast's Hyper Key does

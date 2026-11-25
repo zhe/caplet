@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import CapletCore
 import IOKit
 
@@ -29,7 +30,11 @@ final class HyperKeyController {
     private var retryTimer: Timer?
     private var capsTap = CapsTap()
     private var displacedMapping: KeyMapping?
-    private var wakeObserver: NSObjectProtocol?
+    private var workspaceObservers: [NSObjectProtocol] = []
+    private var lockObservers: [NSObjectProtocol] = []
+    /// The remap is lifted while keys are hidden from Caplet or the Mac sleeps; see `suspend()`.
+    private(set) var suspended = false
+    private var secureInputTimer: Timer?
     private var keyboardPort: IONotificationPortRef?
     private var keyboardIterator: io_iterator_t = 0
     private var checkTimer: Timer?
@@ -69,6 +74,10 @@ final class HyperKeyController {
         case .active, .takenOver: break
         case .off, .waitingForAccessibility, .failed: return
         }
+        if suspended {
+            guard !Self.screenIsLocked, !IsSecureEventInputEnabled() else { return }
+            suspended = false
+        }
         guard let keyboards = HIDUtil.keyboardMappings() else { return }
         switch HyperRemap.check(keyboards: keyboards) {
         case .intact:
@@ -83,6 +92,34 @@ final class HyperKeyController {
     func takeBack() {
         guard case .takenOver = state else { return }
         if reapply() { recheck() }
+    }
+
+    /// Password fields, including the lock screen's, turn on Secure Event Input, and then the
+    /// event tap gets no key events: the remapped key would send an F18 nobody sees, leaving
+    /// capitals stuck as they were, and no shortcut can work either. So Caps Lock goes back to
+    /// being Caps Lock until keys reach Caplet again, where `recheck()` remaps it. The user's own
+    /// Caps Lock remap stays off meanwhile; restoring it would read as another app taking over.
+    private func suspend() {
+        guard state == .active, !suspended, let current = HIDUtil.currentMappings() else { return }
+        capsTap.reset()
+        if HIDUtil.set(HyperRemap.disabling(current, restoring: nil)) { suspended = true }
+    }
+
+    /// No notification reports Secure Event Input turning on or off, so it's polled.
+    private func checkSecureInput() {
+        if IsSecureEventInputEnabled() { suspend() } else if suspended { recheck() }
+    }
+
+    /// The unlock and session notifications say the user is back; the wake check asks the session.
+    private func resume() {
+        suspended = false
+        scheduleCheck(after: 0.5)
+    }
+
+    private static var screenIsLocked: Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
+        return session["CGSSessionScreenIsLocked"] as? Bool == true
+            || session[kCGSessionOnConsoleKey] as? Bool == false
     }
 
     private var capsLockTakenOver: Bool {
@@ -118,13 +155,32 @@ final class HyperKeyController {
 
     /// The built-in keyboard can come back after sleep without the remap, and other apps
     /// with a hyper key reapply theirs on wake, so check after waking and whenever a
-    /// keyboard appears. The delay lets those apps finish first.
+    /// keyboard appears. The delay lets those apps finish first. Password fields, locking,
+    /// sleeping and switching users lift the remap until keys reach Caplet again (see `suspend()`).
     private func watchKeyboards() {
-        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.scheduleCheck() }
+        let workspace = NSWorkspace.shared.notificationCenter
+        let distributed = DistributedNotificationCenter.default()
+        func observe(_ center: NotificationCenter, _ name: Notification.Name,
+                     _ action: @escaping @MainActor (HyperKeyController) -> Void) -> NSObjectProtocol {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if let self { action(self) } }
+            }
         }
+        workspaceObservers = [
+            observe(workspace, NSWorkspace.didWakeNotification) { $0.scheduleCheck() },
+            observe(workspace, NSWorkspace.willSleepNotification) { $0.suspend() },
+            // Fast user switching: the login window and the other user's session see the remap too.
+            observe(workspace, NSWorkspace.sessionDidResignActiveNotification) { $0.suspend() },
+            observe(workspace, NSWorkspace.sessionDidBecomeActiveNotification) { $0.resume() },
+        ]
+        lockObservers = [
+            observe(distributed, Notification.Name("com.apple.screenIsLocked")) { $0.suspend() },
+            observe(distributed, Notification.Name("com.apple.screenIsUnlocked")) { $0.resume() },
+        ]
+        secureInputTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkSecureInput() }
+        }
+        secureInputTimer?.tolerance = 0.1
 
         guard let matching = IOServiceMatching("IOHIDEventService"),
               let port = IONotificationPortCreate(kIOMainPortDefault) else { return }
@@ -143,8 +199,13 @@ final class HyperKeyController {
     }
 
     private func stopWatchingKeyboards() {
-        if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
-        wakeObserver = nil
+        workspaceObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
+        lockObservers.forEach(DistributedNotificationCenter.default().removeObserver)
+        workspaceObservers = []
+        lockObservers = []
+        secureInputTimer?.invalidate()
+        secureInputTimer = nil
+        suspended = false
         if keyboardIterator != 0 { IOObjectRelease(keyboardIterator) }
         keyboardIterator = 0
         if let keyboardPort { IONotificationPortDestroy(keyboardPort) }
@@ -153,9 +214,9 @@ final class HyperKeyController {
         checkTimer = nil
     }
 
-    fileprivate func scheduleCheck() {
+    fileprivate func scheduleCheck(after delay: TimeInterval = 2) {
         checkTimer?.invalidate()
-        checkTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: false) { [weak self] _ in
+        checkTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.checkTimer = nil
                 self?.recheck()

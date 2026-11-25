@@ -287,6 +287,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .failed(let reason): notes.append("⇪ shortcuts are off: \(reason). Relaunch Caplet to retry")
         case .takenOver(let key):
             notes.append("⇪ shortcuts are off: another app remapped Caps Lock" + (key.map { " to \($0)" } ?? ""))
+        case .active where hyperKey.suspended:
+            notes.append("⇪ shortcuts are paused while a password field has secure input on")
         case .off, .active: break
         }
         if case .takenOver = hyperKey.state { takeBackItem.isHidden = false } else { takeBackItem.isHidden = true }
